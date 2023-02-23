@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import Stack from "@mui/material/Stack";
 import Button from "@mui/material/Button";
 import Grid from "@mui/material/Grid";
@@ -10,22 +11,47 @@ import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import {token, url as baseUrl} from '../utils/api';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import Select from '@mui/material/Select';
 
 function Upload() {
     const [formValues, setFormValues] = useState({
-        facilityId: "",
+        organisationUnitId: "",
         dateRange: "",
         htsData: "",
         patientData: "",
         biometricsData: ""
     })
-
+    const [facilities, setFacilities] = useState([]);
     // const [HtsData, setHtsData] = useState(false);
     // const [BiometricsData, setBiometricsData] = useState(false);
     // const [PatientData, setPatientData] = useState(false);
 
+    useEffect(() => {
+        Facilities()
+    }, []);
+
+    const Facilities =()=>{
+    axios
+        .get(`${baseUrl}account`,
+            { headers: {"Authorization" : `Bearer ${token}`} }
+        )
+        .then((response) => {
+        console.log(response.data);
+            setFacilities(response.data.applicationUserOrganisationUnits);
+        })
+        .catch((error) => {
+        //console.log(error);
+        });
+
+    }
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+        //console.log(name, value)
         setFormValues({
             ...formValues,
             [name]: value,
@@ -57,18 +83,26 @@ function Upload() {
                             flexDirection: 'row'}}>
                             <Grid container spacing={2}>
                                 <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        margin="normal"
-                                        required
-                                        fullWidth
-                                        id="facility"
-                                        label="Facility Name"
-                                        name="facility"
-                                    />
+                                <FormControl fullWidth>
+                                <InputLabel id="demo-simple-select-label">Facility</InputLabel>
+                                    <Select
+                                        labelId="demo-simple-select-label"
+                                        id="demo-simple-select"
+                                        value={formValues.organisationUnitId}
+                                        label="Facility"
+                                        onChange={handleInputChange}
+                                        name="organisationUnitId"
+                                        >
+                                        {
+                                            facilities.map((value) => (
+                                                <MenuItem key={value.id} value={value.organisationUnitId}>{value.organisationUnitName}</MenuItem>
+                                            ))
+                                        }
+                                    </Select>
+                                </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        margin="normal"
                                         required
                                         fullWidth
                                         id="email"
