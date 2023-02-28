@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
     <description>Sync Module</description>
     <properties>
-        <java.version>11</java.version>
+        <java.version>1.8</java.version>
         <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
     </properties>
 
@@ -291,15 +291,15 @@
 <!--							<arguments>install</arguments>-->
 <!--						</configuration>-->
 <!--					</execution>-->
-					<!--<execution>
-						<id>npm run build</id>
-						<goals>
-							<goal>npm</goal>
-						</goals>
-						<configuration>
-							<arguments>run build</arguments>
-						</configuration>
-					</execution>-->
+<!--					<execution>-->
+<!--						<id>npm run build</id>-->
+<!--						<goals>-->
+<!--							<goal>npm</goal>-->
+<!--						</goals>-->
+<!--						<configuration>-->
+<!--							<arguments>run build</arguments>-->
+<!--						</configuration>-->
+<!--					</execution>-->
 				</executions>
 			</plugin>
             <plugin>
@@ -309,7 +309,7 @@
                         <phase>generate-resources</phase>
                         <configuration>
                             <target>
-                                <copy todir="${project.build.directory}/classes/views/static/hiv">
+                                <copy todir="${project.build.directory}/classes/views/static/sync">
                                     <fileset dir="${project.basedir}/build"/>
                                 </copy>
                             </target>

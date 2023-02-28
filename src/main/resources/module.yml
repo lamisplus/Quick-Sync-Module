@@ -1,6 +1,6 @@
 basePackage: org.lamisplus.modules.sync
 name: SyncModule
-dependencies: {PatientModule: 1.0.0, HivModule: 1.0.0, HtsModule: 1.0.0, BiometricModule: 1.0.0}
+dependencies: {PatientModule: 1.0.0, HivModule: 1.0.0, BiometricModule: 1.0.0}
 store: true
 menus:
   - icon:
