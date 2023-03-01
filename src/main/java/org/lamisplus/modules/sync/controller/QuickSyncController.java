@@ -2,7 +2,8 @@ package org.lamisplus.modules.sync.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.lamisplus.modules.sync.dto.PersonImportDTO;
+import org.lamisplus.modules.sync.domain.QuickSyncHistory;
+import org.lamisplus.modules.sync.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
@@ -14,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -35,8 +37,13 @@ public class QuickSyncController {
 			messagingTemplate.convertAndSend("/topic/quick-sync", "end");
 	}
 	
+	@GetMapping("/history")
+	public ResponseEntity<List<QuickSyncHistory>> getQuickSyncHistory() {
+		return ResponseEntity.ok(questionQuickSyncService.getQuickSyncHistory());
+	}
+	
 	@PostMapping("/import/person-data")
-	public ResponseEntity<PersonImportDTO> importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
+	public ResponseEntity<QuickSyncHistoryDTO> importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
 	  return  ResponseEntity.ok(questionQuickSyncService.importPersonData(facility, file));
 	}
 	

@@ -10,9 +10,11 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 
-public class PersonImportDTO {
+public class QuickSyncHistoryDTO {
 	String filename;
 	String facilityName;
+	String tableName;
 	LocalDateTime dateUpdated;
+	Integer fileSize;
 	String status;
 }
