@@ -2,7 +2,10 @@ package org.lamisplus.modules.sync.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.lamisplus.modules.sync.domain.QuickSyncHistory;
+import org.lamisplus.modules.sync.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -25,9 +29,6 @@ public class QuickSyncController {
 	@GetMapping("/export/person-data")
 	public void exportPersonData(HttpServletResponse response,
 			@RequestParam("facilityId") Long facility,
-//			@RequestParam(name = "biometric", defaultValue = "false") boolean biometric,
-//			@RequestParam(name = "hts", defaultValue = "false") boolean hts,
-//			@RequestParam(name = "patient", defaultValue ="false") boolean patient,
 			@RequestParam("startDate") LocalDate start,
 			@RequestParam("endDate") LocalDate end) throws IOException {
 		messagingTemplate.convertAndSend("/topic/quick-sync", "start");
@@ -36,9 +37,14 @@ public class QuickSyncController {
 			messagingTemplate.convertAndSend("/topic/quick-sync", "end");
 	}
 	
+	@GetMapping("/history")
+	public ResponseEntity<List<QuickSyncHistory>> getQuickSyncHistory() {
+		return ResponseEntity.ok(questionQuickSyncService.getQuickSyncHistory());
+	}
+	
 	@PostMapping("/import/person-data")
-	public String importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
-	  return  questionQuickSyncService.importPersonData(facility, file);
+	public ResponseEntity<QuickSyncHistoryDTO> importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
+	  return  ResponseEntity.ok(questionQuickSyncService.importPersonData(facility, file));
 	}
 	
 	

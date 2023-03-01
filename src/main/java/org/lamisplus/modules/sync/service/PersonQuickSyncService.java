@@ -7,11 +7,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FileUtils;
-import org.lamisplus.modules.patient.domain.dto.PatientDTO;
+import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
+import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.patient.repository.PersonRepository;
+import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.dto.PersonDTO;
+import org.lamisplus.modules.sync.dto.QuickSyncHistoryDTO;
+import org.lamisplus.modules.sync.repository.QuickSyncHistoryRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -32,10 +35,12 @@ import java.util.stream.Collectors;
 public class PersonQuickSyncService {
 	private final PersonRepository personRepository;
 	private final  PersonDTOMapper personDTOMapper;
-	
 	private  final  PersonDTOToPersonMapper personMapper;
-	
 	private  final ObjectMapper mapper;
+	private final OrganisationUnitRepository  organisationUnitRepository;
+	
+	private final QuickSyncHistoryRepository quickSyncHistoryRepository;
+	
 	
 	
 	public Set<PersonDTO> getPersonDTO(Long facilityId, LocalDate start, LocalDate end) {
@@ -63,17 +68,34 @@ public class PersonQuickSyncService {
 		return bao;
 	}
 	
-	public  String  importPersonData(Long facilityId, MultipartFile file) throws IOException {
+	public QuickSyncHistoryDTO importPersonData(Long facilityId, MultipartFile file) throws IOException {
 		byte[] bytes = file.getBytes();
 		String data = new String(bytes, StandardCharsets.UTF_8);
-		List<PersonDTO> personDTOS = mapper.readValue(data, new TypeReference<List<PersonDTO>>() {});
-		System.out.println(personDTOS.size()+" "+ personDTOS);
-//		personDTOS.stream()
-//				.map(personMapper)
-//				.forEach(personRepository::save);
-		return personDTOS.size() + " person data saved successfully";
-		
-		
+		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+		List<PersonDTO> personDTOS = mapper.readValue(data, new TypeReference<List<PersonDTO>>() {
+		});
+		personDTOS.stream()
+				.map(personMapper)
+				.forEach(personRepository::save);
+		System.out.println("file name: "+ file.getOriginalFilename());
+		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
+				.status("completed")
+				.filename(file.getOriginalFilename())
+				.facilityName(facility.getName())
+				.tableName("person")
+				.fileSize(personDTOS.size())
+				.dateUpdated(LocalDateTime.now())
+				.build();
+		QuickSyncHistory quickSyncHistory = new QuickSyncHistory();
+		quickSyncHistory.setFilename(historyDTO.getFilename());
+		quickSyncHistory.setStatus("completed");
+		quickSyncHistory.setTableName(historyDTO.getTableName());
+		quickSyncHistory.setFileSize(historyDTO.getFileSize());
+		quickSyncHistory.setFilename(file.getOriginalFilename());
+		quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
+		quickSyncHistoryRepository.save(quickSyncHistory);
+		return  historyDTO;
+	
 		
 	}
 	private static void writeDataToFile(Long facilityId, byte[] personDataBytes, Date date) throws IOException {
@@ -94,4 +116,7 @@ public class PersonQuickSyncService {
 	}
 	
 	
+	public List<QuickSyncHistory> getQuickSyncHistory() {
+		return quickSyncHistoryRepository.findAll();
+	}
 }
