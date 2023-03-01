@@ -7,9 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FileUtils;
+import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
+import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.patient.domain.dto.PatientDTO;
+import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.sync.dto.PersonDTO;
+import org.lamisplus.modules.sync.dto.PersonImportDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,9 +37,13 @@ public class PersonQuickSyncService {
 	private final PersonRepository personRepository;
 	private final  PersonDTOMapper personDTOMapper;
 	
+	
 	private  final  PersonDTOToPersonMapper personMapper;
 	
 	private  final ObjectMapper mapper;
+	private final PersonRepository personRepository;
+	private final OrganisationUnitRepository  organisationUnitRepository;
+	
 	
 	
 	public Set<PersonDTO> getPersonDTO(Long facilityId, LocalDate start, LocalDate end) {
@@ -63,17 +71,23 @@ public class PersonQuickSyncService {
 		return bao;
 	}
 	
-	public  String  importPersonData(Long facilityId, MultipartFile file) throws IOException {
+	public PersonImportDTO importPersonData(Long facilityId, MultipartFile file) throws IOException {
 		byte[] bytes = file.getBytes();
 		String data = new String(bytes, StandardCharsets.UTF_8);
-		List<PersonDTO> personDTOS = mapper.readValue(data, new TypeReference<List<PersonDTO>>() {});
-		System.out.println(personDTOS.size()+" "+ personDTOS);
-//		personDTOS.stream()
-//				.map(personMapper)
-//				.forEach(personRepository::save);
-		return personDTOS.size() + " person data saved successfully";
-		
-		
+		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+		List<PersonDTO> personDTOS = mapper.readValue(data, new TypeReference<List<PersonDTO>>() {
+		});
+		//System.out.println(personDTOS.size()+" "+ personDTOS);
+		personDTOS.stream()
+				.map(personMapper)
+				.forEach(personRepository::save);
+		return PersonImportDTO.builder()
+				.status("completed")
+				.filename(file.getName())
+				.facilityName(facility.getName())
+				.dateUpdated(LocalDateTime.now())
+				.build();
+	
 		
 	}
 	private static void writeDataToFile(Long facilityId, byte[] personDataBytes, Date date) throws IOException {
