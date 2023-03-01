@@ -46,8 +46,7 @@ public class QuickSyncController {
 	public ResponseEntity<QuickSyncHistoryDTO> importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
 	  return  ResponseEntity.ok(questionQuickSyncService.importPersonData(facility, file));
 	}
-	
-	
+
 	private void setStream(ByteArrayOutputStream baos, HttpServletResponse response) throws IOException {
 		response.setHeader("Content-Type", "application/octet-stream");
 		response.setHeader("Content-Length", Integer.toString(baos.size()));
