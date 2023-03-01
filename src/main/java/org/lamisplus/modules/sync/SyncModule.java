@@ -15,6 +15,7 @@ public class SyncModule extends AcrossModule {
 		addApplicationContextConfigurer (new ComponentScanConfigurer(
 				getClass ().getPackage ().getName () + ".repository",
 				getClass ().getPackage ().getName () + ".service",
+				getClass ().getPackage ().getName () + ".mapper",
 				getClass ().getPackage ().getName () + ".controller"
 		));
 	}
