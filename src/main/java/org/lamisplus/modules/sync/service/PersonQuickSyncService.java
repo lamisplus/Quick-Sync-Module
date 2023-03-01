@@ -1,0 +1,97 @@
+package org.lamisplus.modules.sync.service;
+
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.io.FileUtils;
+import org.lamisplus.modules.patient.domain.dto.PatientDTO;
+import org.lamisplus.modules.patient.repository.PersonRepository;
+import org.lamisplus.modules.sync.dto.PersonDTO;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class PersonQuickSyncService {
+	private final PersonRepository personRepository;
+	private final  PersonDTOMapper personDTOMapper;
+	
+	private  final  PersonDTOToPersonMapper personMapper;
+	
+	private  final ObjectMapper mapper;
+	
+	
+	public Set<PersonDTO> getPersonDTO(Long facilityId, LocalDate start, LocalDate end) {
+		// not best practice
+		return personRepository.findAll().stream()
+				.filter(person -> isPersonCreatedWithinDateRange(start, end, person.getCreatedDate()))
+				.filter(person -> person.getFacilityId().equals(facilityId))
+				.map(personDTOMapper)
+				.collect(Collectors.toSet());
+	}
+	
+	public ByteArrayOutputStream generatePersonData(HttpServletResponse response, Long facilityId,  LocalDate start, LocalDate end){
+		ByteArrayOutputStream bao = new ByteArrayOutputStream();
+		try{
+			mapper.enable(SerializationFeature.INDENT_OUTPUT);
+			mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+			Set<PersonDTO> personData = getPersonDTO(facilityId, start, end);
+			byte[] personDataBytes = mapper.writeValueAsBytes(personData);
+			Date date = new Date();
+			writeDataToFile(facilityId, personDataBytes, date);
+			bao.write(personDataBytes);
+		}catch (Exception e){
+			e.printStackTrace();
+		}
+		return bao;
+	}
+	
+	public  String  importPersonData(Long facilityId, MultipartFile file) throws IOException {
+		byte[] bytes = file.getBytes();
+		String data = new String(bytes, StandardCharsets.UTF_8);
+		List<PersonDTO> personDTOS = mapper.readValue(data, new TypeReference<List<PersonDTO>>() {});
+		System.out.println(personDTOS.size()+" "+ personDTOS);
+//		personDTOS.stream()
+//				.map(personMapper)
+//				.forEach(personRepository::save);
+		return personDTOS.size() + " person data saved successfully";
+		
+		
+		
+	}
+	private static void writeDataToFile(Long facilityId, byte[] personDataBytes, Date date) throws IOException {
+		SimpleDateFormat dateFormat = new SimpleDateFormat("ddMMyyyy");
+		SimpleDateFormat timeFormat = new SimpleDateFormat("HHmmss.ms");
+		String folder = ("quicksync/").concat(Long.toString(facilityId).concat("/")).concat("person").concat("/");
+		String fileName = dateFormat.format(date) + "_" + timeFormat.format(date) + ".json";
+		File file = new File(folder.concat(fileName));
+		FileUtils.writeByteArrayToFile(file, personDataBytes);
+	}
+	
+	private static boolean isPersonCreatedWithinDateRange(
+			LocalDate start,
+			LocalDate end,
+			LocalDateTime personCreatedDate) {
+		return personCreatedDate.isAfter(start.atTime(0, 0))
+				&& personCreatedDate.isBefore(end.atTime(0, 0));
+	}
+	
+	
+}
