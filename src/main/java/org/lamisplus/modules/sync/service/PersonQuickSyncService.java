@@ -112,8 +112,7 @@ public class PersonQuickSyncService {
 			LocalDate end,
 			LocalDateTime personCreatedDate) {
 		System.out.println("date created:"+ personCreatedDate);
-		LocalDateTime startDate = start.atTime(23, 59);
-		System.out.println("start date:"+ startDate);
+		LocalDateTime startDate = start.atTime(0, 0);
 		return personCreatedDate.isAfter(startDate)
 				&& personCreatedDate.isBefore(end.atTime(23, 59));
 	}
