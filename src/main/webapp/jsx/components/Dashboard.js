@@ -90,7 +90,6 @@ function HomePage(props) {
   const urlIndex = getQueryParams("tab", props.location && props.location.search ? props.location.search : ""); 
   const urlTabs = urlIndex !== null ? urlIndex : getstate ;
   useEffect ( () => {
-
     switch(urlTabs){  
       case "database-sync": return setValue(0)
       case "setting": return setValue(1)

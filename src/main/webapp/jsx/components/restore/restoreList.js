@@ -4,6 +4,7 @@ import axios from "axios";
 import { token as token, url as baseUrl } from "./../../../api";
 import { forwardRef } from "react";
 import { Link } from "react-router-dom";
+
 import AddBox from "@material-ui/icons/AddBox";
 import ArrowUpward from "@material-ui/icons/ArrowUpward";
 import Check from "@material-ui/icons/Check";
@@ -19,21 +20,9 @@ import Remove from "@material-ui/icons/Remove";
 import SaveAlt from "@material-ui/icons/SaveAlt";
 import Search from "@material-ui/icons/Search";
 import ViewColumn from "@material-ui/icons/ViewColumn";
-import {
-  Modal,
-  ModalHeader,
-  ModalBody,
-  Form,
-  Row,
-  Col,
-  Card,
-  CardBody,
-  FormGroup,
-  Label,
-  Input,
-} from "reactstrap";
+
 import Button from "@material-ui/core/Button";
-import { Spinner } from "reactstrap";
+import { Badge, Spinner } from "reactstrap";
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import RestoreModal from "./restoreModal";
@@ -97,14 +86,29 @@ const RestoreList = (props) => {
     setModalDownload(!modalDownload);
   };
 
+  const PageTitle = ({ motherMenu, activeMenu, pageContent }) => {
+    let path = window.location.pathname.split("/");
+  	return (
+  		<div className="row page-titles mx-0">
+  			<ol className="breadcrumb">
+  				<li className="breadcrumb-item active"><Link to={`/${path[path.length - 1]}`}>{motherMenu}</Link></li>
+  				<li className="breadcrumb-item  "><Link to={`/${path[path.length - 1]}`}>{activeMenu}</Link></li>
+  			</ol>
+  		</div>
+  	);
+  };
+
+
   return (
-    <div>
+    <>
+      <PageTitle activeMenu="Quick Sync" motherMenu="Sync " />
       <Button
         variant="contained"
         color="primary"
         className=" float-right mr-1"
         startIcon={<UploadIcon />}
         onClick={syncDataBase}
+        style={{backgroundColor:'#014d88',fontWeight:"bolder"}}
       >
         <span style={{ textTransform: "capitalize" }}>Upload </span>
       </Button>
@@ -114,6 +118,7 @@ const RestoreList = (props) => {
         className=" float-right mr-1"
         startIcon={<DownloadIcon />}
         onClick={syncDownload}
+        style={{backgroundColor:'#014d88',fontWeight:"bolder"}}
       >
         <span style={{ textTransform: "capitalize" }}>Download </span>
       </Button>
@@ -131,16 +136,16 @@ const RestoreList = (props) => {
           { title: "Status", field: "status", filtering: false },
         ]}
         data={syncList.map((row) => ({
-          name: row.facilityName,
+          name: row.filename,
           url: row.tableName,
           uploadSize: row.fileSize,
           date: row.dateCreated.replace("T", " "),
-          status: row.status,
+          status: <Badge color="info">{row.status}</Badge>,
         }))}
         options={{
           headerStyle: {
-            backgroundColor: "#9F9FA5",
-            color: "#000",
+            backgroundColor: "#014d88",
+            color: "#fff",
           },
           searchFieldStyle: {
             width: "200%",
@@ -160,7 +165,7 @@ const RestoreList = (props) => {
         togglestatus={toggleDownload}
         setSyncList={setSyncList}
       />
-    </div>
+    </>
   );
 };
 
