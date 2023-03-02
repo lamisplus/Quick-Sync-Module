@@ -92,6 +92,7 @@ public class PersonQuickSyncService {
 		quickSyncHistory.setTableName(historyDTO.getTableName());
 		quickSyncHistory.setFileSize(historyDTO.getFileSize());
 		quickSyncHistory.setFilename(file.getOriginalFilename());
+		quickSyncHistory.setFacilityName(historyDTO.getFacilityName());
 		quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
 		quickSyncHistoryRepository.save(quickSyncHistory);
 		return  historyDTO;
