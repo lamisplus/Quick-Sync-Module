@@ -77,7 +77,6 @@ public class PersonQuickSyncService {
 		personDTOS.stream()
 				.map(personMapper)
 				.forEach(personRepository::save);
-		System.out.println("file name: "+ file.getOriginalFilename());
 		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
 				.status("completed")
 				.filename(file.getOriginalFilename())
@@ -112,8 +111,11 @@ public class PersonQuickSyncService {
 			LocalDate start,
 			LocalDate end,
 			LocalDateTime personCreatedDate) {
-		return personCreatedDate.isAfter(start.atTime(0, 0))
-				&& personCreatedDate.isBefore(end.atTime(0, 0));
+		System.out.println("date created:"+ personCreatedDate);
+		LocalDateTime startDate = start.atTime(23, 59);
+		System.out.println("start date:"+ startDate);
+		return personCreatedDate.isAfter(startDate)
+				&& personCreatedDate.isBefore(end.atTime(23, 59));
 	}
 	
 	
