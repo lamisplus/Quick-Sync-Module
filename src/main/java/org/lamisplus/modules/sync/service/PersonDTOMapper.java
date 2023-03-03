@@ -12,6 +12,11 @@ public class PersonDTOMapper implements Function<Person, PersonDTO> {
 	
 	@Override
 	public PersonDTO apply(Person person) {
+		return getPersonDTO(person);
+		
+	}
+	
+	public  PersonDTO getPersonDTO(Person person) {
 		return PersonDTO.builder()
 				.active(person.getActive())
 				.address(person.getAddress())
@@ -40,6 +45,5 @@ public class PersonDTOMapper implements Function<Person, PersonDTO> {
 				.surname(person.getSurname())
 				.uuid(person.getUuid())
 				.build();
-		
 	}
 }

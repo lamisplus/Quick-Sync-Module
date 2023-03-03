@@ -9,13 +9,16 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FileUtils;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
+import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.dto.PersonDTO;
 import org.lamisplus.modules.sync.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.repository.QuickSyncHistoryRepository;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.util.BeanUtil;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
@@ -27,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -60,7 +64,7 @@ public class PersonQuickSyncService {
 			Set<PersonDTO> personData = getPersonDTO(facilityId, start, end);
 			byte[] personDataBytes = mapper.writeValueAsBytes(personData);
 			Date date = new Date();
-			writeDataToFile(facilityId, personDataBytes, date);
+			//writeDataToFile(facilityId, personDataBytes, date);
 			bao.write(personDataBytes);
 		}catch (Exception e){
 			e.printStackTrace();
@@ -76,8 +80,18 @@ public class PersonQuickSyncService {
 		});
 		personDTOS.stream()
 				.map(personMapper)
-				.forEach(personRepository::save);
-		System.out.println("file name: "+ file.getOriginalFilename());
+				.forEach(person -> {
+					Optional<Person> existPerson =
+							personRepository.getPersonByUuidAndFacilityIdAndArchived(person.getUuid(), person.getFacilityId(), 0);
+					if(existPerson.isPresent()) {
+						Person person1 = existPerson.get();
+						PersonDTO personDTO = convertPersonDTO(person);
+						BeanUtils.copyProperties(personDTO, person1);
+						personRepository.save(person1);
+					}else {
+						personRepository.save(person);
+					}
+				});
 		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
 				.status("completed")
 				.filename(file.getOriginalFilename())
@@ -92,6 +106,7 @@ public class PersonQuickSyncService {
 		quickSyncHistory.setTableName(historyDTO.getTableName());
 		quickSyncHistory.setFileSize(historyDTO.getFileSize());
 		quickSyncHistory.setFilename(file.getOriginalFilename());
+		quickSyncHistory.setFacilityName(historyDTO.getFacilityName());
 		quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
 		quickSyncHistoryRepository.save(quickSyncHistory);
 		return  historyDTO;
@@ -111,12 +126,24 @@ public class PersonQuickSyncService {
 			LocalDate start,
 			LocalDate end,
 			LocalDateTime personCreatedDate) {
-		return personCreatedDate.isAfter(start.atTime(0, 0))
-				&& personCreatedDate.isBefore(end.atTime(0, 0));
+		System.out.println("date created:"+ personCreatedDate);
+		LocalDateTime startDate = start.atTime(0, 0);
+		System.out.println("start: "+ startDate);
+		LocalDateTime endDate = end.atTime(23, 59);
+		System.out.println("end: "+ endDate);
+		return personCreatedDate.isAfter(startDate)
+				&& personCreatedDate.isBefore(endDate);
 	}
 	
 	
 	public List<QuickSyncHistory> getQuickSyncHistory() {
 		return quickSyncHistoryRepository.findAll();
 	}
+	
+	private PersonDTO convertPersonDTO(Person person) {
+		return personDTOMapper.getPersonDTO(person);
+		
+	}
+	
+	
 }
