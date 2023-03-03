@@ -85,7 +85,8 @@ public class PersonQuickSyncService {
 							personRepository.getPersonByUuidAndFacilityIdAndArchived(person.getUuid(), person.getFacilityId(), 0);
 					if(existPerson.isPresent()) {
 						Person person1 = existPerson.get();
-						BeanUtils.copyProperties(person,person1);
+						PersonDTO personDTO = convertPersonDTO(person);
+						BeanUtils.copyProperties(personDTO, person1);
 						personRepository.save(person1);
 					}else {
 						personRepository.save(person);
@@ -138,4 +139,11 @@ public class PersonQuickSyncService {
 	public List<QuickSyncHistory> getQuickSyncHistory() {
 		return quickSyncHistoryRepository.findAll();
 	}
+	
+	private PersonDTO convertPersonDTO(Person person) {
+		return personDTOMapper.getPersonDTO(person);
+		
+	}
+	
+	
 }
