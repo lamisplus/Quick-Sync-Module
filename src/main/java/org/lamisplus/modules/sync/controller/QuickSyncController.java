@@ -22,8 +22,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/quick-sync")
 public class QuickSyncController {
-	
 	private final SimpMessageSendingOperations messagingTemplate;
+	
 	private final PersonQuickSyncService questionQuickSyncService;
 	
 	@GetMapping("/export/person-data")
@@ -31,20 +31,36 @@ public class QuickSyncController {
 			@RequestParam("facilityId") Long facility,
 			@RequestParam("startDate") LocalDate start,
 			@RequestParam("endDate") LocalDate end) throws IOException {
-		messagingTemplate.convertAndSend("/topic/quick-sync", "start");
+		messagingTemplate.convertAndSend("/topic/person-data", "start");
 			ByteArrayOutputStream baos = questionQuickSyncService.generatePersonData(response, facility, start, end);
 			setStream(baos, response);
-			messagingTemplate.convertAndSend("/topic/quick-sync", "end");
+			messagingTemplate.convertAndSend("/topic/person-data", "end");
+	}
+	
+	@PostMapping("/import/person-data")
+	public ResponseEntity<QuickSyncHistoryDTO> importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
+		return  ResponseEntity.ok(questionQuickSyncService.importPersonData(facility, file));
+	}
+	
+	@PostMapping("/import/biometric-data")
+	public ResponseEntity<QuickSyncHistoryDTO> importBiometricData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
+		return  ResponseEntity.ok(questionQuickSyncService.importBiometricData(facility, file));
+	}
+	
+	@GetMapping("/export/biometric-data")
+	public void exportBiometricData(HttpServletResponse response,
+	                             @RequestParam("facilityId") Long facility,
+	                             @RequestParam("startDate") LocalDate start,
+	                             @RequestParam("endDate") LocalDate end) throws IOException {
+		messagingTemplate.convertAndSend("/topic/biometric-data", "start");
+		ByteArrayOutputStream baos = questionQuickSyncService.generateBiometricData(response, facility, start, end);
+		setStream(baos, response);
+		messagingTemplate.convertAndSend("/topic/biometric-data", "end");
 	}
 	
 	@GetMapping("/history")
 	public ResponseEntity<List<QuickSyncHistory>> getQuickSyncHistory() {
 		return ResponseEntity.ok(questionQuickSyncService.getQuickSyncHistory());
-	}
-	
-	@PostMapping("/import/person-data")
-	public ResponseEntity<QuickSyncHistoryDTO> importPersonData(@RequestParam("facilityId") Long facility, @RequestParam("file") MultipartFile file) throws IOException {
-	  return  ResponseEntity.ok(questionQuickSyncService.importPersonData(facility, file));
 	}
 
 	private void setStream(ByteArrayOutputStream baos, HttpServletResponse response) throws IOException {
