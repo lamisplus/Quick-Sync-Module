@@ -1,5 +1,6 @@
 package org.lamisplus.modules.sync.service;
 
+import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.sync.dto.PersonDTO;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,11 @@ import java.util.function.Function;
 public class PersonDTOToPersonMapper  implements Function<PersonDTO , Person> {
 	@Override
 	public Person apply(PersonDTO personDTO) {
+		return getPerson(personDTO);
+	}
+	
+	@NotNull
+	private static Person getPerson(PersonDTO personDTO) {
 		Person person = new Person();
 		person.setArchived(personDTO.getArchived());
 		person.setActive(personDTO.getActive());
@@ -38,5 +44,10 @@ public class PersonDTOToPersonMapper  implements Function<PersonDTO , Person> {
 		person.setSurname(personDTO.getSurname());
 		person.setUuid(personDTO.getUuid());
 		return person;
+	}
+	
+	public Person getPersonFromDTO(PersonDTO personDTO) {
+		return getPerson(personDTO);
+		
 	}
 }

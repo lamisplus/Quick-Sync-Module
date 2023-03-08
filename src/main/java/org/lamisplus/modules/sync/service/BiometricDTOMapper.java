@@ -1,16 +1,21 @@
 package org.lamisplus.modules.sync.service;
 
+import lombok.RequiredArgsConstructor;
 import org.lamisplus.modules.biometric.domain.Biometric;
+import org.lamisplus.modules.biometric.repository.BiometricRepository;
+import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.sync.dto.BiometricDTO;
+import org.lamisplus.modules.sync.dto.BiometricMetaDataDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Function;
 
 @Service
-public class BiometricDTOMapper  implements Function<Biometric, BiometricDTO> {
+@RequiredArgsConstructor
+public class BiometricDTOMapper  implements Function<Biometric, BiometricMetaDataDTO> {
 	@Override
-	public BiometricDTO apply(Biometric biometric) {
-		return  BiometricDTO.builder()
+	public BiometricMetaDataDTO apply(Biometric biometric) {
+			return	BiometricMetaDataDTO.builder()
 				.archived(biometric.getArchived())
 				.biometricType(biometric.getBiometricType())
 				.date(biometric.getDate())
@@ -20,7 +25,7 @@ public class BiometricDTOMapper  implements Function<Biometric, BiometricDTO> {
 				.personUuid(biometric.getPersonUuid())
 				.template(biometric.getTemplate())
 				.templateType(biometric.getTemplateType())
-				.reason(biometric.getReason())
+				//.reason(biometric.getReason())
 				.build();
 	}
 }
