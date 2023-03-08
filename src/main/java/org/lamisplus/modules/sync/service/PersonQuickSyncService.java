@@ -1,17 +1,22 @@
 package org.lamisplus.modules.sync.service;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FileUtils;
+import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
+import org.lamisplus.modules.biometric.repository.BiometricRepository;
 import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
+import org.lamisplus.modules.sync.dto.BiometricDTO;
+import org.lamisplus.modules.sync.dto.BiometricMetaDataDTO;
 import org.lamisplus.modules.sync.dto.PersonDTO;
 import org.lamisplus.modules.sync.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.repository.QuickSyncHistoryRepository;
@@ -28,11 +33,9 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +48,11 @@ public class PersonQuickSyncService {
 	
 	private final QuickSyncHistoryRepository quickSyncHistoryRepository;
 	
+	private  final BiometricRepository biometricRepository;
+	
+	private final BiometricDTOMapper biometricDTOMapper;
+	
+	private final BiometricDTOToBiometricMapper biometricMapper;
 	
 	
 	public Set<PersonDTO> getPersonDTO(Long facilityId, LocalDate start, LocalDate end) {
@@ -55,6 +63,40 @@ public class PersonQuickSyncService {
 				.map(personDTOMapper)
 				.collect(Collectors.toSet());
 	}
+	public List<BiometricDTO> getBiometricDTO(Long facilityId, LocalDate start, LocalDate end) {
+		// not best practice
+		List<BiometricDTO> data = new ArrayList<BiometricDTO>();
+		
+		Set<BiometricMetaDataDTO> biometricRows = biometricRepository.findAll().stream()
+				.filter(biometric -> isPersonCreatedWithinDateRange(start, end, biometric.getCreatedDate()))
+				.filter(biometric -> biometric.getFacilityId().equals(facilityId))
+				.map(biometricDTOMapper)
+				.collect(Collectors.toSet());
+		
+		Set<String> persons = biometricRows.stream().map(BiometricMetaDataDTO::getPersonUuid).collect(Collectors.toSet());
+		
+		persons.forEach(personUuid -> {
+			Optional<Person> personOp  =
+					personRepository.getPersonByUuidAndFacilityIdAndArchived(personUuid, facilityId, 0);
+			personOp.ifPresent(person -> {
+				Set<BiometricMetaDataDTO> personBiometricRows =
+						biometricRows.stream()
+								.filter(biometricRow -> biometricRow.getPersonUuid().equals(person.getUuid()))
+								.collect(Collectors.toSet());
+				BiometricDTO bio = BiometricDTO.builder()
+						.biometric(personBiometricRows)
+						.person(personDTOMapper.getPersonDTO(person))
+						.build();
+				if(!data.contains(bio)) {
+				    data.add(bio);
+				}
+				
+			});
+		});
+		return data;
+	}
+	
+	
 	
 	public ByteArrayOutputStream generatePersonData(HttpServletResponse response, Long facilityId,  LocalDate start, LocalDate end){
 		ByteArrayOutputStream bao = new ByteArrayOutputStream();
@@ -63,8 +105,6 @@ public class PersonQuickSyncService {
 			mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 			Set<PersonDTO> personData = getPersonDTO(facilityId, start, end);
 			byte[] personDataBytes = mapper.writeValueAsBytes(personData);
-			Date date = new Date();
-			//writeDataToFile(facilityId, personDataBytes, date);
 			bao.write(personDataBytes);
 		}catch (Exception e){
 			e.printStackTrace();
@@ -92,25 +132,8 @@ public class PersonQuickSyncService {
 						personRepository.save(person);
 					}
 				});
-		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
-				.status("completed")
-				.filename(file.getOriginalFilename())
-				.facilityName(facility.getName())
-				.tableName("person")
-				.fileSize(personDTOS.size())
-				.dateUpdated(LocalDateTime.now())
-				.build();
-		QuickSyncHistory quickSyncHistory = new QuickSyncHistory();
-		quickSyncHistory.setFilename(historyDTO.getFilename());
-		quickSyncHistory.setStatus("completed");
-		quickSyncHistory.setTableName(historyDTO.getTableName());
-		quickSyncHistory.setFileSize(historyDTO.getFileSize());
-		quickSyncHistory.setFilename(file.getOriginalFilename());
-		quickSyncHistory.setFacilityName(historyDTO.getFacilityName());
-		quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
-		quickSyncHistoryRepository.save(quickSyncHistory);
-		return  historyDTO;
-	
+		return getQuickSyncHistoryDTO(file, facility, personDTOS.size(), "person");
+		
 		
 	}
 	private static void writeDataToFile(Long facilityId, byte[] personDataBytes, Date date) throws IOException {
@@ -126,11 +149,8 @@ public class PersonQuickSyncService {
 			LocalDate start,
 			LocalDate end,
 			LocalDateTime personCreatedDate) {
-		System.out.println("date created:"+ personCreatedDate);
 		LocalDateTime startDate = start.atTime(0, 0);
-		System.out.println("start: "+ startDate);
 		LocalDateTime endDate = end.atTime(23, 59);
-		System.out.println("end: "+ endDate);
 		return personCreatedDate.isAfter(startDate)
 				&& personCreatedDate.isBefore(endDate);
 	}
@@ -146,4 +166,66 @@ public class PersonQuickSyncService {
 	}
 	
 	
+//	public Object importBiometricData(Long facility, MultipartFile file) {
+//
+//	}
+	
+	public ByteArrayOutputStream generateBiometricData(HttpServletResponse response, Long facilityId, LocalDate start, LocalDate end) {
+		ByteArrayOutputStream bao = new ByteArrayOutputStream();
+		try{
+			mapper.enable(SerializationFeature.INDENT_OUTPUT);
+			mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+			List<BiometricDTO> personData = getBiometricDTO(facilityId, start, end);
+			byte[] personDataBytes = mapper.writeValueAsBytes(personData);
+			bao.write(personDataBytes);
+		}catch (Exception e){
+			e.printStackTrace();
+		}
+		return bao;
+	}
+	
+	public QuickSyncHistoryDTO importBiometricData(Long facilityId, MultipartFile file) throws IOException {
+		byte[] bytes = file.getBytes();
+		String data = new String(bytes, StandardCharsets.UTF_8);
+		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
+		
+		biometrics.parallelStream()
+				.forEach(biometricDTO -> {
+					Optional<Person> existPerson =
+							personRepository.getPersonByUuidAndFacilityIdAndArchived(biometricDTO.getPerson().getUuid(),
+									biometricDTO.getPerson().getFacilityId(), 0);
+					if(!existPerson.isPresent()) {
+						Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
+						personRepository.save(person);
+					}
+					biometricDTO.getBiometric()
+							.stream()
+							.map(biometricMapper)
+							.forEach(biometricRepository::save);
+				});
+		return getQuickSyncHistoryDTO(file, facility, biometrics.size(), "biometric");
+	}
+	
+	@NotNull
+	private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize, String tableName) {
+		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
+				.status("completed")
+				.filename(file.getOriginalFilename())
+				.facilityName(facility.getName())
+				.tableName(tableName)
+				.fileSize(filesize)
+				.dateUpdated(LocalDateTime.now())
+				.build();
+		QuickSyncHistory quickSyncHistory = new QuickSyncHistory();
+		quickSyncHistory.setFilename(historyDTO.getFilename());
+		quickSyncHistory.setStatus("completed");
+		quickSyncHistory.setTableName(historyDTO.getTableName());
+		quickSyncHistory.setFileSize(historyDTO.getFileSize());
+		quickSyncHistory.setFilename(file.getOriginalFilename());
+		quickSyncHistory.setFacilityName(historyDTO.getFacilityName());
+		quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
+		quickSyncHistoryRepository.save(quickSyncHistory);
+		return historyDTO;
+	}
 }
