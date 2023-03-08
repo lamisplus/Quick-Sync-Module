@@ -132,7 +132,7 @@ public class PersonQuickSyncService {
 						personRepository.save(person);
 					}
 				});
-		return getQuickSyncHistoryDTO(file, facility, personDTOS.size());
+		return getQuickSyncHistoryDTO(file, facility, personDTOS.size(), "person");
 		
 		
 	}
@@ -204,16 +204,16 @@ public class PersonQuickSyncService {
 							.map(biometricMapper)
 							.forEach(biometricRepository::save);
 				});
-		return getQuickSyncHistoryDTO(file, facility, biometrics.size());
+		return getQuickSyncHistoryDTO(file, facility, biometrics.size(), "biometric");
 	}
 	
 	@NotNull
-	private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize) {
+	private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize, String tableName) {
 		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
 				.status("completed")
 				.filename(file.getOriginalFilename())
 				.facilityName(facility.getName())
-				.tableName("person")
+				.tableName(tableName)
 				.fileSize(filesize)
 				.dateUpdated(LocalDateTime.now())
 				.build();
