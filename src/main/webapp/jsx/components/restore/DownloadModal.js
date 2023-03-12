@@ -145,7 +145,7 @@ const DownloadModal = (props) => {
           });
 
           FileSaver.saveAs(blob, `${fileName}.json`);
-          toast.success("Json generated successfully");
+          toast.success("Patient Json generated successfully");
         })
         .catch((error) => {
           setLoading(false);
@@ -179,7 +179,7 @@ const DownloadModal = (props) => {
           });
 
           FileSaver.saveAs(blob, `${fileName}.json`);
-          toast.success("Json generated successfully");
+          toast.success("Biometrics Json generated successfully");
         })
         .catch((error) => {
           setLoading(false);
@@ -268,8 +268,9 @@ const DownloadModal = (props) => {
                           borderRadius: "0.2rem",
                         }}
                       >
+                        <option value={""}>select</option>
                         <option value={"biometrics"}>Biometrics</option>
-                        <option value={"hts"}>HTS</option>
+                        {/*<option value={"hts"}>HTS</option>*/}
                         <option value={"patient"}>Patient</option>
 
                       </Input>

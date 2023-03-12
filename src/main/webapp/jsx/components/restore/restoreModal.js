@@ -138,7 +138,7 @@ const DatabaseRestore = (props) => {
         .then((response) => {
           setLoading(false);
           syncHistory();
-          toast.success("Json uploaded successfully");
+          toast.success("Patient Json uploaded successfully");
         })
         .catch((error) => {
           setLoading(false);
@@ -166,7 +166,7 @@ const DatabaseRestore = (props) => {
         .then((response) => {
           setLoading(false);
           syncHistory();
-          toast.success("Json uploaded successfully");
+          toast.success("Biometrics Json uploaded successfully");
         })
         .catch((error) => {
           setLoading(false);
