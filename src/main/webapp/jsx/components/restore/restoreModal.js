@@ -119,11 +119,14 @@ const DatabaseRestore = (props) => {
     e.preventDefault();
 
     if (validateInputs()) {
+      let fileName = upload.files.name;
+
       const formData = new FormData();
 
       formData.append("file", upload.files);
 
-      axios
+      if (fileName.includes("patient") === true) {
+        axios
         .post(
           `${baseUrl}quick-sync/import/person-data?facilityId=${upload.facilityId}`,
           formData,
@@ -135,7 +138,7 @@ const DatabaseRestore = (props) => {
         .then((response) => {
           setLoading(false);
           syncHistory();
-          toast.success("Json uploaded successfully");
+          toast.success("Patient Json uploaded successfully");
         })
         .catch((error) => {
           setLoading(false);
@@ -150,6 +153,39 @@ const DatabaseRestore = (props) => {
             toast.error("Something went wrong uploading. Please try again...");
           }
         });
+      }else if (fileName.includes("biometrics") === true) {
+        axios
+        .post(
+          `${baseUrl}quick-sync/import/biometric-data?facilityId=${upload.facilityId}`,
+          formData,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            responseType: "blob",
+          }
+        )
+        .then((response) => {
+          setLoading(false);
+          syncHistory();
+          toast.success("Biometrics Json uploaded successfully");
+        })
+        .catch((error) => {
+          setLoading(false);
+          if (error.response && error.response.data) {
+            let errorMessage =
+              error.response.data.apierror &&
+              error.response.data.apierror.message !== ""
+                ? error.response.data.apierror.message
+                : "Something went wrong uploading, please try again";
+            toast.error(errorMessage);
+          } else {
+            toast.error("Something went wrong uploading. Please try again...");
+          }
+        });
+      }else {
+        return null;
+      }
+
+
     }
 
     props.togglestatus();
