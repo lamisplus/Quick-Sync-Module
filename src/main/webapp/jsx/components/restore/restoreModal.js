@@ -115,6 +115,18 @@ const DatabaseRestore = (props) => {
     });
   };
 
+  async function syncHistory() {
+    axios
+      .get(`${baseUrl}quick-sync/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((response) => {
+        console.log("sync restore",response.data)
+        props.setSyncList(response.data);
+      })
+      .catch((error) => {});
+  }
+
   const uploadProcess = (e) => {
     e.preventDefault();
 
@@ -190,18 +202,6 @@ const DatabaseRestore = (props) => {
 
     props.togglestatus();
   };
-
-  async function syncHistory() {
-    axios
-      .get(`${baseUrl}quick-sync/history`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((response) => {
-        console.log("sync",response.data)
-        props.setSyncList(response.data);
-      })
-      .catch((error) => {});
-  }
 
   return (
     <div>

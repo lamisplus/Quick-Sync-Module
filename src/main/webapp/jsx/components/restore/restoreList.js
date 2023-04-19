@@ -159,7 +159,7 @@ const RestoreList = (props) => {
           debounceInterval: 400,
         }}
       />
-      <RestoreModal modalstatus={modal} togglestatus={toggle} />
+      <RestoreModal modalstatus={modal} togglestatus={toggle} setSyncList={setSyncList}/>
       <DownloadModal
         modalstatus={modalDownload}
         togglestatus={toggleDownload}
