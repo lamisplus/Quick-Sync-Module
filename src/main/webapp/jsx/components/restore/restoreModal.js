@@ -196,8 +196,6 @@ const DatabaseRestore = (props) => {
       }else {
         return null;
       }
-
-
     }
 
     props.togglestatus();
