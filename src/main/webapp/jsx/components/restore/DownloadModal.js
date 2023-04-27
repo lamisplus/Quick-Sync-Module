@@ -125,7 +125,9 @@ const DownloadModal = (props) => {
 
     //console.log("data", download);
     if (validateInputs()) {
-      axios
+
+      if (download.program === "patient") {
+        axios
         .get(
           `${baseUrl}quick-sync/export/person-data?facilityId=${download.facilityId}&startDate=${download.startDate}&endDate=${download.endDate}`,
           {
@@ -143,7 +145,7 @@ const DownloadModal = (props) => {
           });
 
           FileSaver.saveAs(blob, `${fileName}.json`);
-          toast.success("Json generated successfully");
+          toast.success("Patient Json generated successfully");
         })
         .catch((error) => {
           setLoading(false);
@@ -158,6 +160,45 @@ const DownloadModal = (props) => {
             toast.error("Something went wrong. Please try again...");
           }
         });
+      }else if (download.program === "biometrics") {
+        axios
+        .get(
+          `${baseUrl}quick-sync/export/biometric-data?facilityId=${download.facilityId}&startDate=${download.startDate}&endDate=${download.endDate}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            responseType: "blob",
+          }
+        )
+        .then((response) => {
+          //console.log(response);
+          setLoading(false);
+          const fileName = `${organisationUnitName} ${download.program} ${currentDate}`;
+          const responseData = response.data;
+          let blob = new Blob([responseData], {
+            type: "application/octet-stream",
+          });
+
+          FileSaver.saveAs(blob, `${fileName}.json`);
+          toast.success("Biometrics Json generated successfully");
+        })
+        .catch((error) => {
+          setLoading(false);
+          if (error.response && error.response.data) {
+            let errorMessage =
+              error.response.data.apierror &&
+              error.response.data.apierror.message !== ""
+                ? error.response.data.apierror.message
+                : "Something went wrong, please try again";
+            toast.error(errorMessage);
+          } else {
+            toast.error("Something went wrong. Please try again...");
+          }
+        });
+      }else {
+        return null;
+      }
+
+
     }
     props.togglestatus();
   };
@@ -227,8 +268,9 @@ const DownloadModal = (props) => {
                           borderRadius: "0.2rem",
                         }}
                       >
+                        <option value={""}>select</option>
                         <option value={"biometrics"}>Biometrics</option>
-                        <option value={"hts"}>HTS</option>
+                        {/*<option value={"hts"}>HTS</option>*/}
                         <option value={"patient"}>Patient</option>
 
                       </Input>

@@ -131,7 +131,7 @@ const RestoreList = (props) => {
         columns={[
           { title: "Facility Name",field: "name"},
           { title: "Table Name", field: "url", filtering: false },
-          { title: "Upload Size", field: "uploadSize", filtering: false },
+          { title: "No of records", field: "uploadSize", filtering: false },
           { title: "Date of Upload ", field: "date", filtering: false },
           { title: "Status", field: "status", filtering: false },
         ]}
@@ -159,7 +159,7 @@ const RestoreList = (props) => {
           debounceInterval: 400,
         }}
       />
-      <RestoreModal modalstatus={modal} togglestatus={toggle} />
+      <RestoreModal modalstatus={modal} togglestatus={toggle} setSyncList={setSyncList}/>
       <DownloadModal
         modalstatus={modalDownload}
         togglestatus={toggleDownload}
