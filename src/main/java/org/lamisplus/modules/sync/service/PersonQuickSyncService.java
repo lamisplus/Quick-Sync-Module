@@ -11,6 +11,7 @@ import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
+import org.lamisplus.modules.biometric.domain.Biometric;
 import org.lamisplus.modules.biometric.repository.BiometricRepository;
 import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.patient.repository.PersonRepository;
@@ -199,10 +200,15 @@ public class PersonQuickSyncService {
 						Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
 						personRepository.save(person);
 					}
-					biometricDTO.getBiometric()
+					List<Biometric> existBiometrics = biometricRepository.findAllByPersonUuid(existPerson.get().getUuid());
+					
+					List<Biometric> currentBiometrics = biometricDTO.getBiometric()
 							.stream()
-							.map(biometricMapper)
-							.forEach(biometricRepository::save);
+							.map(biometricMapper).collect(Collectors.toList());
+					
+					if(existBiometrics.size() != currentBiometrics.size()){
+						currentBiometrics.forEach(biometricRepository::save);
+					}
 				});
 		return getQuickSyncHistoryDTO(file, facility, biometrics.size(), "biometric");
 	}
