@@ -3,7 +3,7 @@ name: QuickSyncModule
 dependencies: {PatientModule: 2.0.2, HivModule: 2.1.1, BiometricModule: 2.0.1}
 store: true
 menus:
-  - icon:
+  - icon: fa fa-upload
     disabled: false
     name: Quick Sync
     state: Sync
