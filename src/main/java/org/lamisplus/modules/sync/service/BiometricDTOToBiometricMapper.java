@@ -2,7 +2,7 @@ package org.lamisplus.modules.sync.service;
 
 
 import org.lamisplus.modules.biometric.domain.Biometric;
-import org.lamisplus.modules.sync.dto.BiometricMetaDataDTO;
+import org.lamisplus.modules.sync.domain.dto.BiometricMetaDataDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Function;

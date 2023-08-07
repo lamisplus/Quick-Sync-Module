@@ -2,10 +2,7 @@ package org.lamisplus.modules.sync.service;
 
 import lombok.RequiredArgsConstructor;
 import org.lamisplus.modules.biometric.domain.Biometric;
-import org.lamisplus.modules.biometric.repository.BiometricRepository;
-import org.lamisplus.modules.patient.repository.PersonRepository;
-import org.lamisplus.modules.sync.dto.BiometricDTO;
-import org.lamisplus.modules.sync.dto.BiometricMetaDataDTO;
+import org.lamisplus.modules.sync.domain.dto.BiometricMetaDataDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Function;
