@@ -3,7 +3,7 @@ name: SyncModule
 dependencies: {PatientModule: 2.0.2, TriageModule: 2.0.1, BiometricModule: 2.0.1 }
 store: true
 menus:
-  - icon:
+  - icon: fa fa-upload
     disabled: false
     name: Sync
     state: Sync
