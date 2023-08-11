@@ -3,7 +3,7 @@ package org.lamisplus.modules.sync.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
-import org.lamisplus.modules.sync.dto.QuickSyncHistoryDTO;
+import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
@@ -31,10 +31,10 @@ public class QuickSyncController {
 			@RequestParam("facilityId") Long facility,
 			@RequestParam("startDate") LocalDate start,
 			@RequestParam("endDate") LocalDate end) throws IOException {
-		messagingTemplate.convertAndSend("/topic/person-data", "start");
+			//messagingTemplate.convertAndSend("/topic/person-data", "start");
 			ByteArrayOutputStream baos = questionQuickSyncService.generatePersonData(response, facility, start, end);
 			setStream(baos, response);
-			messagingTemplate.convertAndSend("/topic/person-data", "end");
+			//messagingTemplate.convertAndSend("/topic/person-data", "end");
 	}
 	
 	@PostMapping("/import/person-data")
@@ -52,10 +52,10 @@ public class QuickSyncController {
 	                             @RequestParam("facilityId") Long facility,
 	                             @RequestParam("startDate") LocalDate start,
 	                             @RequestParam("endDate") LocalDate end) throws IOException {
-		messagingTemplate.convertAndSend("/topic/biometric-data", "start");
+		//messagingTemplate.convertAndSend("/topic/biometric-data", "start");
 		ByteArrayOutputStream baos = questionQuickSyncService.generateBiometricData(response, facility, start, end);
 		setStream(baos, response);
-		messagingTemplate.convertAndSend("/topic/biometric-data", "end");
+		//messagingTemplate.convertAndSend("/topic/biometric-data", "end");
 	}
 	
 	@GetMapping("/history")

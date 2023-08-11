@@ -1,4 +1,4 @@
-package org.lamisplus.modules.sync.dto;
+package org.lamisplus.modules.sync.domain.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

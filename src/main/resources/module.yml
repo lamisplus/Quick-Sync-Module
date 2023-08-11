@@ -1,16 +1,17 @@
 basePackage: org.lamisplus.modules.sync
+
 name: QuickSyncModule
 dependencies: {PatientModule: 2.0.4, HivModule: 2.1.4, BiometricModule: 2.0.2}
 store: true
 menus:
   - icon: fa fa-upload
     disabled: false
-    name: Quick Sync
+    name: Sync
     state: Sync
     url: /across/resources/static/sync/index.html
 umdLocation: /across/resources/static/sync/index.html
 webModules:
   - breadcrumb: Sync
-    name: QuickSyncModule
+    name: SyncModule
     path: sync
     position: 99

@@ -1,9 +1,15 @@
-package org.lamisplus.modules.sync.dto;
+package org.lamisplus.modules.sync.domain.dto;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.*;
 import org.hibernate.annotations.Type;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,7 +41,9 @@ public class PersonDTO implements Serializable {
 	private JsonNode organization;
 	@Type(type = "jsonb-node")
 	private JsonNode contact;
+	@JsonSerialize(using = LocalDateToStringSerializer.class)
 	private LocalDate dateOfBirth;
+	@JsonSerialize(using = LocalDateToStringSerializer.class)
 	private LocalDate dateOfRegistration;
 	private Integer archived;
 	private  String ninNumber;
@@ -48,4 +56,11 @@ public class PersonDTO implements Serializable {
 	private Boolean isDateOfBirthEstimated;
 	private String fullName;
 	private  Long  facilityId;
+}
+class LocalDateToStringSerializer extends JsonSerializer<LocalDate> {
+	private static final ToStringSerializer instance = new ToStringSerializer();
+	@Override
+	public void serialize(LocalDate value, JsonGenerator gen, SerializerProvider serializers) throws  IOException {
+		instance.serialize(value.toString(), gen, serializers);
+	}
 }
