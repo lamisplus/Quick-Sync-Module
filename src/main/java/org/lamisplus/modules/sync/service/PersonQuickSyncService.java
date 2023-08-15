@@ -35,6 +35,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -220,6 +221,7 @@ public class PersonQuickSyncService {
 		mapper.findAndRegisterModules();
 		configureMapperToHandleDate(mapper);
 		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
+		AtomicInteger count = new AtomicInteger();
 		biometrics.parallelStream()
 				.forEach(biometricDTO -> {
 					Optional<Person> existPerson =
@@ -230,6 +232,7 @@ public class PersonQuickSyncService {
 						personRepository.save(person);
 					}
 					List<Biometric> existBiometrics = biometricRepository.findAllByPersonUuid(existPerson.get().getUuid());
+					
 					List<Biometric> currentBiometrics = biometricDTO.getBiometric()
 							.stream()
 							.map(biometricMapper)
@@ -238,9 +241,8 @@ public class PersonQuickSyncService {
 								return b;
 							})
 							.collect(Collectors.toList());
-					if(existBiometrics.size() != currentBiometrics.size()){
-						biometricRepository.saveAll(currentBiometrics);
-					}
+					     LOG.info("biometric List: " + currentBiometrics.size());
+						currentBiometrics.parallelStream().forEach(b -> biometricRepository.save(b));
 				});
 		return getQuickSyncHistoryDTO(file, facility, biometrics.size(), "biometric");
 	}

@@ -17,6 +17,9 @@ public class BiometricDTOToBiometricMapper implements Function<BiometricMetaData
 		int recapture = biometricDTO.getRecapture() == null ? 0 : biometricDTO.getRecapture();
 		Biometric biometric = new Biometric();
 		biometric.setArchived(biometricDTO.getArchived());
+		biometric.setVersionIso20(true);
+		biometric.setCreatedBy("Sync-module");
+		biometric.setLastModifiedBy("Sync-module");
 		biometric.setBiometricType(biometricDTO.getBiometricType());
 		biometric.setDeviceName(biometricDTO.getDeviceName());
 		biometric.setDate(biometricDTO.getDate());
