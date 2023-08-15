@@ -1,6 +1,7 @@
 basePackage: org.lamisplus.modules.sync
-name: SyncModule
-dependencies: {PatientModule: 2.0.2, TriageModule: 2.0.1, BiometricModule: 2.0.1 }
+
+name: QuickSyncModule
+dependencies: {PatientModule: 2.0.4, HivModule: 2.1.4, BiometricModule: 2.0.2}
 store: true
 menus:
   - icon: fa fa-upload
