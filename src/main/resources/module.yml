@@ -1,6 +1,6 @@
 basePackage: org.lamisplus.modules.sync
 
-name: QuickSyncModule
+name: SyncModule
 dependencies: {PatientModule: 2.0.4, HivModule: 2.1.4, BiometricModule: 2.0.2}
 store: true
 menus:

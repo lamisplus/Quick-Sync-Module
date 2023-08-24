@@ -221,7 +221,7 @@ public class PersonQuickSyncService {
 		mapper.findAndRegisterModules();
 		configureMapperToHandleDate(mapper);
 		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
-		LOG.info("data imported {}", biometrics);
+		//LOG.info("data imported {}", biometrics);
 		LOG.info("biometric List: " + biometrics.size());
 		AtomicInteger total = new AtomicInteger();
 		int notSave = 0;
@@ -235,7 +235,6 @@ public class PersonQuickSyncService {
 							Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
 							personRepository.save(person);
 						}
-						//List<Biometric> existBiometrics = biometricRepository.findAllByPersonUuid(existPerson.get().getUuid());
 						List<Biometric> currentBiometrics = biometricDTO.getBiometric()
 								.stream()
 								.map(biometricMapper)
@@ -247,12 +246,15 @@ public class PersonQuickSyncService {
 						currentBiometrics.parallelStream().forEach(b ->
 						{
 							LOG.info("id {}", b.getId());
-							Optional<Biometric> existBiometricOptional =
-									biometricRepository.findById(b.getId());
-							if (existBiometricOptional.isPresent()) {
+							List<Biometric> existBiometric =
+									biometricRepository.findAllByPersonUuid(b.getPersonUuid());
+							boolean alreadySaved = existBiometric.stream()
+									.anyMatch(eb -> eb.getCreatedBy().equals(b.getCreatedBy()));
+							
+							if (alreadySaved) {
 							} else {
-								total.getAndIncrement();
 								biometricRepository.save(b);
+								total.getAndIncrement();
 							}
 						});
 					});
@@ -261,7 +263,7 @@ public class PersonQuickSyncService {
 			e.printStackTrace();
 		}
 		LOG.error("not saved", notSave);
-		return getQuickSyncHistoryDTO(file, facility, biometrics.size(), "biometric");
+		return getQuickSyncHistoryDTO(file, facility, total.get(), "biometric");
 	}
 	
 	private static MutableConfigOverride configureMapperToHandleDate(ObjectMapper mapper) {
