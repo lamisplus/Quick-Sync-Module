@@ -124,7 +124,7 @@ public class PersonQuickSyncService {
 			ObjectMapper mapper = new ObjectMapper();
 			mapper.enable(SerializationFeature.INDENT_OUTPUT);
 			mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-			Set<PersonDTO> personData = getPersonDTO(facilityId, start, end);
+			Set<PersonDTO> personData = getPersonDTO(facilityId, start, end.plusDays(1));
 			byte[] personDataBytes = mapper.writeValueAsBytes(personData);
 			bao.write(personDataBytes);
 		}catch (Exception e){
@@ -204,7 +204,7 @@ public class PersonQuickSyncService {
 			ObjectMapper mapper = new ObjectMapper();
 			mapper.enable(SerializationFeature.INDENT_OUTPUT);
 			mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-			List<BiometricDTO> personData = getBiometricDTO(facilityId, start, end);
+			List<BiometricDTO> personData = getBiometricDTO(facilityId, start, end.plusDays(1));
 			byte[] personDataBytes = mapper.writeValueAsBytes(personData);
 			bao.write(personDataBytes);
 		}catch (Exception e){
@@ -221,29 +221,46 @@ public class PersonQuickSyncService {
 		mapper.findAndRegisterModules();
 		configureMapperToHandleDate(mapper);
 		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
-		AtomicInteger count = new AtomicInteger();
-		biometrics.parallelStream()
-				.forEach(biometricDTO -> {
-					Optional<Person> existPerson =
-							personRepository.getPersonByUuidAndFacilityIdAndArchived(biometricDTO.getPerson().getUuid(),
-									biometricDTO.getPerson().getFacilityId(), 0);
-					if(!existPerson.isPresent()) {
-						Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
-						personRepository.save(person);
-					}
-					List<Biometric> existBiometrics = biometricRepository.findAllByPersonUuid(existPerson.get().getUuid());
-					
-					List<Biometric> currentBiometrics = biometricDTO.getBiometric()
-							.stream()
-							.map(biometricMapper)
-							.map(b -> {
-								b.setFacilityId(facilityId);
-								return b;
-							})
-							.collect(Collectors.toList());
-					     LOG.info("biometric List: " + currentBiometrics.size());
-						currentBiometrics.parallelStream().forEach(b -> biometricRepository.save(b));
-				});
+		LOG.info("data imported {}", biometrics);
+		LOG.info("biometric List: " + biometrics.size());
+		AtomicInteger total = new AtomicInteger();
+		int notSave = 0;
+		try {
+			biometrics.parallelStream()
+					.forEach(biometricDTO -> {
+						Optional<Person> existPerson =
+								personRepository.getPersonByUuidAndFacilityIdAndArchived(biometricDTO.getPerson().getUuid(),
+										biometricDTO.getPerson().getFacilityId(), 0);
+						if (!existPerson.isPresent()) {
+							Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
+							personRepository.save(person);
+						}
+						//List<Biometric> existBiometrics = biometricRepository.findAllByPersonUuid(existPerson.get().getUuid());
+						List<Biometric> currentBiometrics = biometricDTO.getBiometric()
+								.stream()
+								.map(biometricMapper)
+								.map(b -> {
+									b.setFacilityId(facilityId);
+									return b;
+								})
+								.collect(Collectors.toList());
+						currentBiometrics.parallelStream().forEach(b ->
+						{
+							LOG.info("id {}", b.getId());
+							Optional<Biometric> existBiometricOptional =
+									biometricRepository.findById(b.getId());
+							if (existBiometricOptional.isPresent()) {
+							} else {
+								total.getAndIncrement();
+								biometricRepository.save(b);
+							}
+						});
+					});
+		}catch (Exception e) {
+			notSave++;
+			e.printStackTrace();
+		}
+		LOG.error("not saved", notSave);
 		return getQuickSyncHistoryDTO(file, facility, biometrics.size(), "biometric");
 	}
 	

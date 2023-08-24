@@ -13,6 +13,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class BiometricMetaDataDTO {
+	private String id;
 	private String personUuid;
 	@NotNull
 	private byte[] template;

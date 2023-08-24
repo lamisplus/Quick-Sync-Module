@@ -16,6 +16,7 @@ public class BiometricDTOMapper  implements Function<Biometric, BiometricMetaDat
 		//Log.info("recaptured value {}", biometric.getRecapture());
 		int recapture = biometric.getRecapture() == null ? 0 : biometric.getRecapture();
 		return BiometricMetaDataDTO.builder()
+				.id(biometric.getId())
 				.archived(biometric.getArchived())
 				.biometricType(biometric.getBiometricType())
 				.date(biometric.getDate())
