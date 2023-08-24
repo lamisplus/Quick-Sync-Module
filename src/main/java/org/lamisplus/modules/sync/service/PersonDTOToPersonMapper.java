@@ -2,7 +2,7 @@ package org.lamisplus.modules.sync.service;
 
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.patient.domain.entity.Person;
-import org.lamisplus.modules.sync.dto.PersonDTO;
+import org.lamisplus.modules.sync.domain.dto.PersonDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Function;

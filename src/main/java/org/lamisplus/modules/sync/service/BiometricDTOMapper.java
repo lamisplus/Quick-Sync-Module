@@ -1,11 +1,9 @@
 package org.lamisplus.modules.sync.service;
 
 import lombok.RequiredArgsConstructor;
+import org.audit4j.core.util.Log;
 import org.lamisplus.modules.biometric.domain.Biometric;
-import org.lamisplus.modules.biometric.repository.BiometricRepository;
-import org.lamisplus.modules.patient.repository.PersonRepository;
-import org.lamisplus.modules.sync.dto.BiometricDTO;
-import org.lamisplus.modules.sync.dto.BiometricMetaDataDTO;
+import org.lamisplus.modules.sync.domain.dto.BiometricMetaDataDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Function;
@@ -15,7 +13,10 @@ import java.util.function.Function;
 public class BiometricDTOMapper  implements Function<Biometric, BiometricMetaDataDTO> {
 	@Override
 	public BiometricMetaDataDTO apply(Biometric biometric) {
-			return	BiometricMetaDataDTO.builder()
+		//Log.info("recaptured value {}", biometric.getRecapture());
+		int recapture = biometric.getRecapture() == null ? 0 : biometric.getRecapture();
+		return BiometricMetaDataDTO.builder()
+				.qSyncId(biometric.getId())
 				.archived(biometric.getArchived())
 				.biometricType(biometric.getBiometricType())
 				.date(biometric.getDate())
@@ -25,7 +26,12 @@ public class BiometricDTOMapper  implements Function<Biometric, BiometricMetaDat
 				.personUuid(biometric.getPersonUuid())
 				.template(biometric.getTemplate())
 				.templateType(biometric.getTemplateType())
-				//.reason(biometric.getReason())
+				.reason(biometric.getReason())
+				.recapture(recapture)
+				.hashed(biometric.getHashed())
+				.imageQuality(biometric.getImageQuality())
+				.reason(biometric.getReason())
+				.count(biometric.getCount())
 				.build();
 	}
 }

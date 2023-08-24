@@ -1,11 +1,11 @@
-package org.lamisplus.modules.sync.dto;
+package org.lamisplus.modules.sync.domain.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import org.hibernate.annotations.Type;
-
 import javax.validation.constraints.NotNull;
 import java.time.LocalDate;
 
@@ -13,6 +13,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class BiometricMetaDataDTO {
+	private String qSyncId;
 	private String personUuid;
 	@NotNull
 	private byte[] template;
@@ -21,6 +22,7 @@ public class BiometricMetaDataDTO {
 	@NotNull
 	private String templateType;
 	@NotNull
+	@JsonSerialize(using = LocalDateToStringSerializer.class)
 	private LocalDate date;
 	private Integer archived = 0;
 	private Boolean iso = false;
@@ -28,4 +30,9 @@ public class BiometricMetaDataDTO {
 	private JsonNode extra;
 	private String deviceName;
 	private String reason;
+	private Integer imageQuality=0;
+	private Integer recapture;
+	private String recaptureMessage;
+	private String hashed;
+	private Integer count;
 }
