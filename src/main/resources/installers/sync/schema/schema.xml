@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.5.xsd">
+
+    <property name="autoIncrement" value="true"/>
+
+    <changeSet id="2022221-001" author="amos-data-fi">
+        <sql>
+            CREATE SEQUENCE IF NOT EXISTS hibernate_sequence START WITH 1 INCREMENT BY 1;
+            CREATE TABLE  IF NOT EXISTS quick_sync_history
+            (
+                id            BIGINT NOT NULL,
+                filename      VARCHAR(255),
+                table_name    VARCHAR(255),
+                facility_name VARCHAR(255),
+                date_created  TIMESTAMP WITHOUT TIME ZONE,
+                file_size     INTEGER,
+                status        VARCHAR(255),
+                CONSTRAINT pk_quick_sync_history PRIMARY KEY (id)
+                );
+        </sql>
+    </changeSet>
+</databaseChangeLog>
