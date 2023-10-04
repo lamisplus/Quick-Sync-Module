@@ -26,6 +26,7 @@ target
 db
 .DS_Store
 local-data
+.jpb
 
 ### NetBeans ###
 /nbproject/private/
