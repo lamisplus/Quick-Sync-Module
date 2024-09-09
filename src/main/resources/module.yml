@@ -10,6 +10,7 @@ menus:
     state: Sync
     url: /across/resources/static/sync/index.html
 umdLocation: /across/resources/static/sync/index.html
+gitHubLink: https://api.github.com/repos/lamisplus/Quick-Sync-Module/releases/latest
 webModules:
   - breadcrumb: Sync
     name: SyncModule
