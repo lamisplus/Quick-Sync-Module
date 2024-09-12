@@ -2,9 +2,12 @@ package org.lamisplus.modules.sync.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
+import org.lamisplus.modules.sync.service.QRReaderService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +19,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -25,7 +29,8 @@ public class QuickSyncController {
 	private final SimpMessageSendingOperations messagingTemplate;
 	
 	private final PersonQuickSyncService questionQuickSyncService;
-	
+	private final QRReaderService qrReaderService;
+
 	@GetMapping("/export/person-data")
 	public void exportPersonData(HttpServletResponse response,
 			@RequestParam("facilityId") Long facility,
@@ -71,4 +76,37 @@ public class QuickSyncController {
 		outputStream.close();
 		response.flushBuffer();
 	}
+
+
+//	@PostMapping("/upload-client-zip")
+//	public ResponseEntity<?> uploadZipFile(@RequestParam("file") MultipartFile file) {
+//		try {
+//			System.out.println("I am inside the uploadZip File controller");
+//			List<Map<String, Object>> result = qrReaderService.processZipFile(file);
+//			return ResponseEntity.ok(result);
+//		} catch (IOException e) {
+//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
+//    }
+//}
+
+
+	@PostMapping("/upload-client-zip")
+	public ResponseEntity<?> uploadZipFile(@RequestParam("file") MultipartFile file) {
+		try {
+			System.out.println("I am inside the uploadZip File controller");
+
+			// Convert MultipartFile to a byte array
+			byte[] fileBytes = file.getBytes();
+
+			// Pass the byte array to the service for processing
+			List<Map<String, Object>> result = qrReaderService.processZipFile(fileBytes);
+
+			return ResponseEntity.ok(result);
+		} catch (IOException e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
+		}
+	}
+
+
+
 }
