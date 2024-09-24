@@ -1,18 +1,19 @@
-package org.lamisplus.modules.sync.service;//package org.lamisplus.modules.sync.service;
+package org.lamisplus.modules.sync.service;
 
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Builder;
+
 import lombok.RequiredArgsConstructor;
-import org.lamisplus.modules.hts.domain.dto.HtsClientRequestDto;
+import org.lamisplus.modules.hts.domain.dto.*;
 import org.lamisplus.modules.hts.service.HtsClientService;
+import org.lamisplus.modules.hts.service.IndexElicitationService;
+import org.lamisplus.modules.hts.service.RiskStratificationService;
 import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
 
 import org.lamisplus.modules.patient.service.PersonService;
 import org.springframework.stereotype.Service;
+
 import java.io.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +30,8 @@ public class QRReaderService {
 
     private final PersonService personService;
     private final HtsClientService htsClientService;
+    private final RiskStratificationService riskStratificationService;
+    private final IndexElicitationService indexElicitationService;
 
     private final ObjectMapper objectMapper;
 
@@ -52,6 +55,92 @@ public class QRReaderService {
     }
 
 
+//    public List<Map<String, Object>> processZipFile(byte[] fileBytes) throws IOException {
+//        List<Map<String, Object>> resultList = new ArrayList<>();
+//        ObjectMapper mapper = new ObjectMapper();
+//        // Convert the byte array to a ZipInputStream
+//        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(fileBytes);
+//             ZipInputStream zipInputStream = new ZipInputStream(byteArrayInputStream)) {
+//            ZipEntry entry;
+//            while ((entry = zipInputStream.getNextEntry()) != null) {
+//                // Check if the entry is a file
+//                if (!entry.isDirectory()) {
+//                    String base64CompressedData = readZipEntry(zipInputStream);
+//                    String decompressedData = decompressAndDecode(base64CompressedData);
+//                    // Convert decompressed JSON data to a Map
+//                    ObjectMapper objectMapper = new ObjectMapper();
+//                    Map<String, Object> jsonData = objectMapper.readValue(decompressedData, new TypeReference<Map<String, Object>>() {
+//                    });
+//                    // Add the parsed JSON data to the result list
+//                    resultList.add(jsonData);
+//                }
+//            }
+//        }
+//        for (Map<String, Object> result : resultList) {
+//            if (result.containsKey("person")) {
+//                Object personField = result.get("person");
+//                Object clientIntakeField = result.get("clientIntake");
+//                Object riskStratificationField = result.get("riskStratification");
+//                Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
+//                Map<String, Object> riskStratificationData = (Map<String, Object>) riskStratificationField;
+////                Object clientIntakeField = result.get("clientIntake");
+//                if (personField instanceof Map) {
+//                    // Single person data
+//                    Map<String, Object> personData = (Map<String, Object>) personField;
+//                    System.out.println("Processing single person data: " + personData);
+//                    PersonDto personDto = convertToPersonDto(personData);
+//                    PersonResponseDto personResponseDto = personService.createPerson(personDto);
+//                    System.out.println("Created person: " + personResponseDto);
+//                    if (personResponseDto != null) {
+//                        Long patientId = personResponseDto.getId();
+//                       RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
+//                       riskStratificationDto.setPersonId(patientId);
+//                        RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
+////                        if(riskStratificationResponseDto != null){
+////                            // sync htsclient
+////                            HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData);
+////                           htsClientRequestDto.setPersonId(riskStratificationResponseDto.getPersonId());
+////                           htsClientRequestDto.setPersonDto(personDto);
+////                           htsClientService.save(htsClientRequestDto);
+////                        }
+//                    }
+//
+//                } else if (personField instanceof List) {
+//                    // List of person data
+//                    List<Map<String, Object>> personList = (List<Map<String, Object>>) personField;
+//                    for (Map<String, Object> personData : personList) {
+//                        System.out.println("Processing person data from list: " + personData);
+//                        PersonDto personDto = convertToPersonDto(personData);
+//                        PersonResponseDto personResponseDto = personService.createPerson(personDto);
+//                        System.out.println("Created person: " + personResponseDto);
+//                        if (personResponseDto != null) {
+//                            Long patientId = personResponseDto.getId();
+//                            System.out.println("I got to before saving risk startification");
+//                            RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
+//                            riskStratificationDto.setPersonId(patientId);
+//                            RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
+//                            System.out.println("I got to after saving risk startification");
+////                            if(riskStratificationResponseDto != null){
+////                                // sync htsclient
+////                                HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData);
+////                                htsClientRequestDto.setPersonId(riskStratificationResponseDto.getPersonId());
+////                                htsClientRequestDto.setPersonDto(personDto);
+////                                htsClientService.save(htsClientRequestDto);
+////                            }
+//                        }
+//                    }
+//                } else {
+//                    System.out.println("Unexpected type for 'person' field.");
+//                }
+//            } else {
+//                System.out.println("No 'person' field found in this result.");
+//
+//            }
+//        }
+//        return resultList;
+//    }
+
+
     public List<Map<String, Object>> processZipFile(byte[] fileBytes) throws IOException {
         List<Map<String, Object>> resultList = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
@@ -73,63 +162,104 @@ public class QRReaderService {
                 }
             }
         }
-
-//        for (Map<String, Object> result : resultList) {
-//            if (result.containsKey("person")) {
-//                Map<String, Object> personData = (Map<String, Object>) result.get("person");
-//                if (personData != null) {
-//                    System.out.println("Person field exists and is not null: " + personData);
-//                    PersonDto personDto = convertToPersonDto(personData);
-//                    PersonResponseDto personResponseDto = personService.createPerson(personDto);
-//                    System.out.println("Created person: " + personResponseDto);
-//                } else {
-//                    System.out.println("Person field is null.");
-//                }
-//            } else {
-//                System.out.println("No 'person' field found in this result.");
-//            }
-//        }
-
-        for (Map<String, Object> result : resultList) {
+        if (!resultList.isEmpty()) {
+            // Access the first object in resultList
+            Map<String, Object> result = resultList.get(0);
             if (result.containsKey("person")) {
                 Object personField = result.get("person");
-//                Object clientIntakeField = result.get("clientIntake");
+                Object clientIntakeField = result.get("clientIntake");
+                Object riskStratificationField = result.get("riskStratification");
+                Object preTestField = result.get("preTest");
+                Object requestResultField = result.get("RequestResult");
+                Object postTestField = result.get("postTest");
+                Object recencyField = result.get("recency");
+                Object elicitationField = result.get("elicitation");
+                Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
+                Map<String, Object> riskStratificationData = (Map<String, Object>) riskStratificationField;
+                Map<String, Object> preTestData = (Map<String, Object>) preTestField;
+                Map<String, Object> requestResultData = (Map<String, Object>) requestResultField;
+                Map<String, Object> postTestData = (Map<String, Object>) postTestField;
+                Map<String, Object> recencyData = (Map<String, Object>) recencyField;
+                Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
                 if (personField instanceof Map) {
                     // Single person data
                     Map<String, Object> personData = (Map<String, Object>) personField;
-                    System.out.println("Processing single person data: " + personData);
+//                    System.out.println("Processing single person data: " + personData);
+                    // Convert and save the person
                     PersonDto personDto = convertToPersonDto(personData);
                     PersonResponseDto personResponseDto = personService.createPerson(personDto);
-                    System.out.println("Created person: " + personResponseDto);
+//                    System.out.println("Created person: " + personResponseDto);
+                    if (personResponseDto != null) {
+                        Long patientId = personResponseDto.getId();
+                        // Create and save the RiskStratificationDto
+                        RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
+                        riskStratificationDto.setPersonId(patientId);
+                        RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
+                        // Sync HtsClient if RiskStratificationResponseDto is not null
+                        if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
+//                            System.out.println("Patient riskStratificationResponseDto.getCode(): " + riskStratificationResponseDto.getCode());
+                            HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
+                            htsClientRequestDto.setPersonId(patientId);
+                            htsClientRequestDto.setPersonDto(personDto);
+//                            htsClientRequestDto.setSource("Mobile");
+                            HtsClientDto htsClientDto = htsClientService.save(htsClientRequestDto);
+                            // sync preTest field id htsClientDto is null;
+                            if (htsClientDto != null & preTestField != null) {
+                                // convertPreTestJsonRequest to HtsPreTestCounselingDto
+                                HtsPreTestCounselingDto htsPreTestCounselingDto = createPreTestCounseling(preTestData, htsClientDto.getId(), patientId);
+                                htsClientService.updatePreTestCounseling(htsClientDto.getId(), htsPreTestCounselingDto);
+                            }
+                            if (htsClientDto != null & requestResultField != null) {
+//                              synchronized  request and result field
+                                HtsRequestResultDto htsRequestResultDto = createRequestResult(requestResultData, htsClientDto.getId(), patientId);
+                                htsClientService.updateRequestResult(htsClientDto.getId(), htsRequestResultDto);
+                            }
+                            if (htsClientDto != null & postTestField != null) {
+//                              synchronized post counselling  filed
+                                PostTestCounselingDto postTestCounselingDto = createPostTestCounseling(postTestData, htsClientDto.getId(), patientId);
+                                htsClientService.updatePostTestCounselingKnowledgeAssessment(htsClientDto.getId(), postTestCounselingDto);
 
-                } else if (personField instanceof List) {
-                    // List of person data
-                    List<Map<String, Object>> personList = (List<Map<String, Object>>) personField;
-                    for (Map<String, Object> personData : personList) {
-                        System.out.println("Processing person data from list: " + personData);
-                        PersonDto personDto = convertToPersonDto(personData);
-                        PersonResponseDto personResponseDto = personService.createPerson(personDto);
-                        System.out.println("Created person: " + personResponseDto);
-
+                            }
+                            if (htsClientDto != null & recencyField != null) {
+//                              synchronized recency filed
+                                HtsRecencyDto recencyDto = createRecency(recencyData, htsClientDto.getId(), patientId);
+                                htsClientService.updateRecency(htsClientDto.getId(), recencyDto);
+                            }
+                            if(htsClientDto != null & elicitationField !=null){
+                                IndexElicitationDto indexElicitationDto = createIndexElicitation(elicitationData, htsClientDto.getId());
+                                indexElicitationService.save(indexElicitationDto);
+                            }
+                        }
                     }
-                } else {
-                    System.out.println("Unexpected type for 'person' field.");
                 }
-            } else {
-                System.out.println("No 'person' field found in this result.");
-
             }
         }
         return resultList;
     }
 
-    // Helper method to convert Integer to Long
     private Long convertToLong(Object value) {
         if (value instanceof Number) {
             return ((Number) value).longValue();
         }
-        return null;
+       else if (value instanceof Integer) {
+            return ((Integer) value).longValue();
+        } else if (value instanceof Long) {
+            return (Long) value;
+        } else {
+            return null;
+        }
     }
+
+    private Boolean convertToBoolean(Object value) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        } else if (value instanceof Integer) {
+            return ((Integer) value) == 1;
+        } else {
+            return null;
+        }
+    }
+
 
     private String readZipEntry(ZipInputStream zipInputStream) throws IOException {
         StringBuilder fileContent = new StringBuilder();
@@ -140,7 +270,6 @@ public class QRReaderService {
         }
         return fileContent.toString();
     }
-
 
     public PersonDto convertToPersonDto(Map<String, Object> personData) {
         Long facilityId = ((Number) personData.get("facilityId")).longValue();
@@ -248,34 +377,215 @@ public class QRReaderService {
         } else {
             throw new IllegalArgumentException("Unexpected type: " + obj.getClass().getName());
         }
+    }
+
+    //
+    private HtsClientRequestDto createHtsClientRequestDto(PersonResponseDto personResponseDto, Map<String, Object> jsonData, Long personId, String riskStratificationCode) {
+        String dateVisitStr = (String) jsonData.get("dateVisit");
+        LocalDate dateVisit = dateVisitStr != null ? LocalDate.parse(dateVisitStr) : null;
+
+        // Check if riskStratificationCode in jsonData is empty or null and set it to the parameter value if so
+        String jsonRiskStratificationCode = (String) jsonData.get("riskStratificationCode");
+        String finalRiskStratificationCode = (jsonRiskStratificationCode == null || jsonRiskStratificationCode.isEmpty())
+                ? riskStratificationCode
+                : jsonRiskStratificationCode;
+
+        // Construct the HtsClientRequestDto with the required fields
+        return new HtsClientRequestDto(
+                (String) jsonData.get("targetGroup"),
+                (String) jsonData.get("clientCode"),
+                dateVisit,
+                jsonData.get("referredFrom") != null ? Long.valueOf((Integer) jsonData.get("referredFrom")) : null,
+                (String) jsonData.get("testingSetting"),
+                finalRiskStratificationCode,
+                jsonData.get("firstTimeVisit") != null ? Boolean.parseBoolean((String) jsonData.get("firstTimeVisit")) : null,
+                jsonData.get("numChildren") != null ? (Integer) jsonData.get("numChildren") : null,
+                jsonData.get("numWives") != null ? (Integer) jsonData.get("numWives") : null,
+                jsonData.get("typeCounseling") != null ? Long.valueOf((Integer) jsonData.get("typeCounseling")) : null,
+                jsonData.get("indexClient") != null ? Boolean.parseBoolean((String) jsonData.get("indexClient")) : null,
+                (String) jsonData.get("indexClientCode"),
+                jsonData.get("previouslyTested") != null ? Boolean.parseBoolean((String) jsonData.get("previouslyTested")) : null,
+                jsonData.get("extra"),
+                jsonData.get("pregnant") != null ? Long.valueOf((Integer) jsonData.get("pregnant")) : null,
+                jsonData.get("breastFeeding") != null ? Boolean.parseBoolean((String) jsonData.get("breastFeeding")) : null,
+                jsonData.get("relationWithIndexClient") != null ? Long.valueOf((Integer) jsonData.get("relationWithIndexClient")) : null
+        );
 
     }
 
-//
-//    private HtsClientRequestDto createHtsClientRequestDto(PersonResponseDto personResponseDto, Map<String, Object> jsonData) {
-//        // Construct the HtsClientRequestDto with the required fields
-//        return new HtsClientRequestDto(
-//                (String) jsonData.get("targetGroup"),
-//                (String) jsonData.get("clientCode"),
-//                LocalDate.parse((String) jsonData.get("dateVisit")),
-//                jsonData.get("referredFrom") != null ? Long.valueOf((Integer) jsonData.get("referredFrom")) : null,
-//                (String) jsonData.get("testingSetting"),
-//                (String) jsonData.get("riskStratificationCode"),
-//                (Boolean) jsonData.get("firstTimeVisit"),
-//                jsonData.get("numChildren") != null ? (Integer) jsonData.get("numChildren") : null,
-//                jsonData.get("numWives") != null ? (Integer) jsonData.get("numWives") : null,
-//                jsonData.get("typeCounseling") != null ? Long.valueOf((Integer) jsonData.get("typeCounseling")) : null,
-//                (Boolean) jsonData.get("indexClient"),
-//                (String) jsonData.get("indexClientCode"),
-//                (Boolean) jsonData.get("previouslyTested"),
-//                jsonData.get("extra"),
-//                jsonData.get("pregnant") != null ? Long.valueOf((Integer) jsonData.get("pregnant")) : null,
-//                (Boolean) jsonData.get("breastFeeding"),
-//                jsonData.get("relationWithIndexClient") != null ? Long.valueOf((Integer) jsonData.get("relationWithIndexClient")) :null
-//       );
-//    }
+
+    private RiskStratificationDto createRiskStratification(Map<String, Object> riskstratificationData) {
+//        System.out.println("I got here inside the risk stratification");
+//        System.out.println("riskstratificationData: " + riskstratificationData);
+        String dobStr = (String) riskstratificationData.get("dob");
+        LocalDate dob = dobStr != null ? LocalDate.parse(dobStr) : null;
+
+        String visitDateStr = (String) riskstratificationData.get("visitDate");
+        LocalDate visitDate = visitDateStr != null ? LocalDate.parse(visitDateStr) : null;
+        return RiskStratificationDto.builder()
+                .age((Integer) riskstratificationData.get("age"))
+                .entryPoint((String) riskstratificationData.get("entryPoint"))
+                .testingSetting((String) riskstratificationData.get("testingSetting"))
+                .modality((String) riskstratificationData.get("modality"))
+                .targetGroup((String) riskstratificationData.get("targetGroup"))
+                .visitDate(visitDate)
+                .dob(dob)
+                .code((String) riskstratificationData.get("code"))
+//                .personId(Long.valueOf((Integer) riskstratificationData.get("personId")))
+                .source((String) riskstratificationData.get("source"))
+                .riskAssessment(riskstratificationData.get("riskAssessment"))
+                .build();
+    }
+
+    private HtsPreTestCounselingDto createPreTestCounseling(Map<String, Object> preTestData, Long htsClientId, Long personId) {
+//        System.out.println("I got here inside the pre-test counseling creation");
+//        System.out.println("preTestData: " + preTestData);
+        Object knowledgeAssessment = preTestData.get("knowledgeAssessment");
+        Object riskAssessment = preTestData.get("riskAssessment");
+        Object tbScreening = preTestData.get("tbScreening");
+        Object stiScreening = preTestData.get("stiScreening");
+        Object sexPartnerRiskAssessment = preTestData.get("sexPartnerRiskAssessment");
+        String latitude = (String) preTestData.get("latitude");
+        String longitude = (String) preTestData.get("longitude");
+
+        HtsPreTestCounselingDto htsPreTestCounselingDto = new HtsPreTestCounselingDto(htsClientId, personId);
+        htsPreTestCounselingDto.setKnowledgeAssessment(knowledgeAssessment);
+        htsPreTestCounselingDto.setRiskAssessment(riskAssessment);
+        htsPreTestCounselingDto.setStiScreening(stiScreening);
+        htsPreTestCounselingDto.setTbScreening(tbScreening);
+        htsPreTestCounselingDto.setSexPartnerRiskAssessment(sexPartnerRiskAssessment);
+
+        return htsPreTestCounselingDto;
+
+    }
+
+    private HtsRequestResultDto createRequestResult(Map<String, Object> requestResultData, Long htsClientId, Long personId) {
+        Object test1 = requestResultData.get("test1");
+        Object confirmatoryTest = requestResultData.get("confirmatoryTest");
+        Object tieBreakerTest = requestResultData.get("tieBreakerTest");
+        String hivTestResult = (String) requestResultData.get("hivTestResult");
+
+        // Second test if first test is positive
+        Object test2 = requestResultData.get("test2");
+        Object confirmatoryTest2 = requestResultData.get("confirmatoryTest2");
+        Object tieBreakerTest2 = requestResultData.get("tieBreakerTest2");
+        String hivTestResult2 = (String) requestResultData.get("hivTestResult2");
+
+        Object syphilisTesting = requestResultData.get("syphilisTesting");
+        Object hepatitisTesting = requestResultData.get("hepatitisTesting");
+        Object others = requestResultData.get("others");
+        Object cd4 = requestResultData.get("cd4");
+
+        // Prep offered and accepted (default to null or false if not available)
+        Boolean prepOffered = (Boolean) requestResultData.getOrDefault("prepOffered", null);
+        Boolean prepAccepted = (Boolean) requestResultData.getOrDefault("prepAccepted", null);
+        HtsRequestResultDto htsRequestResultDto = new HtsRequestResultDto(
+                htsClientId,
+                personId,
+                test1,
+                confirmatoryTest,
+                tieBreakerTest,
+                hivTestResult,
+                test2,
+                confirmatoryTest2,
+                tieBreakerTest2,
+                hivTestResult2,
+                syphilisTesting,
+                hepatitisTesting
+        );
+        htsRequestResultDto.setCd4(cd4);
+        htsRequestResultDto.setPrepOffered(prepOffered);
+        htsRequestResultDto.setPrepAccepted(prepAccepted);
+        htsRequestResultDto.setOthers(others);
+
+        return htsRequestResultDto;
+
+    }
+
+    private PostTestCounselingDto createPostTestCounseling(Map<String, Object> postTestData, Long htsClientId, Long personId) {
+        System.out.println("I got here inside the post-test counseling creation");
+        System.out.println("postTestData: " + postTestData);
+        // Extracting fields from the postTestData map
+        Object postTestCounselingKnowledgeAssessment = postTestData.get("postTestCounselingKnowledgeAssessment");
+        String source = (String) postTestData.get("source");
+        String latitude = (String) postTestData.get("latitude");
+        String longitude = (String) postTestData.get("longitude");
+        return new PostTestCounselingDto(
+                htsClientId,
+                personId,
+                postTestCounselingKnowledgeAssessment
+        );
+    }
+
+    private HtsRecencyDto createRecency(Map<String, Object> recencyData, Long htsClientId, Long personId) {
+        Object recency = recencyData.get("recency");
+        String source = (String) recencyData.get("source");
+        String latitude = (String) recencyData.get("latitude");
+        String longitude = (String) recencyData.get("longitude");
+        return new HtsRecencyDto(
+                htsClientId,
+                personId,
+                recency
+        );
+    }
 
 
+    private IndexElicitationDto createIndexElicitation(Map<String, Object> elicitationData, Long htsClientId) {
+        // Extracting fields from the elicitationData map
+        String firstName = (String) elicitationData.get("firstName");
+        String lastName = (String) elicitationData.get("lastName");
+        String middleName = (String) elicitationData.get("middleName");
+        String phoneNumber = (String) elicitationData.get("phoneNumber");
+        String altPhoneNumber = (String) elicitationData.get("altPhoneNumber");
+        String address = (String) elicitationData.get("address");
+        String hangOutSpots = (String) elicitationData.get("hangOutSpots");
+        String latitude = (String) elicitationData.get("latitude");
+        String longitude = (String) elicitationData.get("longitude");
+        String uuid = (String) elicitationData.get("uuid");
+
+        Boolean isDateOfBirthEstimated = (Boolean) elicitationData.get("isDateOfBirthEstimated");
+        LocalDate dob = elicitationData.containsKey("dob") ? LocalDate.parse((String) elicitationData.get("dob")) : null;
+        LocalDate datePartnerCameForTesting = elicitationData.containsKey("datePartnerCameForTesting") ? LocalDate.parse((String) elicitationData.get("datePartnerCameForTesting")) : null;
+        // Converting values to Long using helper method
+        Long sex = convertToLong(elicitationData.get("sex"));
+        Long physicalHurt = convertToLong(elicitationData.get("physicalHurt"));
+        Long threatenToHurt = convertToLong(elicitationData.get("threatenToHurt"));
+        Long notificationMethod = convertToLong(elicitationData.get("notificationMethod"));
+        Long partnerTestedPositive = convertToLong(elicitationData.get("partnerTestedPositive"));
+        Long relationshipToIndexClient = convertToLong(elicitationData.get("relativeToIndexClient"));
+        Long sexuallyUncomfortable = convertToLong(elicitationData.get("sexuallyUncomfortable"));
+        Boolean currentlyLiveWithPartner = convertToBoolean(elicitationData.get("currentlyLiveWithPartner"));
+
+        String offeredIns = elicitationData.containsKey("offeredIns") ? elicitationData.get("offeredIns").toString() : null;
+        String acceptedIns = elicitationData.containsKey("acceptedIns") ? elicitationData.get("acceptedIns").toString() : null;
+
+        return IndexElicitationDto.builder()
+                .htsClientId(htsClientId)
+                .dob(dob)
+                .isDateOfBirthEstimated(isDateOfBirthEstimated)
+                .sex(sex)
+                .address(address)
+                .lastName(lastName)
+                .firstName(firstName)
+                .middleName(middleName)
+                .phoneNumber(phoneNumber)
+                .altPhoneNumber(altPhoneNumber)
+                .hangOutSpots(hangOutSpots)
+                .physicalHurt(physicalHurt)
+                .threatenToHurt(threatenToHurt)
+                .partnerTestedPositive(partnerTestedPositive)
+                .relationshipToIndexClient(relationshipToIndexClient)
+                .sexuallyUncomfortable(sexuallyUncomfortable)
+                .currentlyLiveWithPartner(currentlyLiveWithPartner)
+                .datePartnerCameForTesting(datePartnerCameForTesting)
+                .offeredIns(offeredIns)
+                .acceptedIns(acceptedIns)
+//                .longitude(longitude)
+//                .latitude(latitude)
+                .source("Mobile")
+                .uuid(uuid)
+                .build();
+    }
 
 
 }
