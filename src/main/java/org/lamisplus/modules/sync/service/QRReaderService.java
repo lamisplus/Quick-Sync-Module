@@ -54,93 +54,6 @@ public class QRReaderService {
         }
     }
 
-
-//    public List<Map<String, Object>> processZipFile(byte[] fileBytes) throws IOException {
-//        List<Map<String, Object>> resultList = new ArrayList<>();
-//        ObjectMapper mapper = new ObjectMapper();
-//        // Convert the byte array to a ZipInputStream
-//        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(fileBytes);
-//             ZipInputStream zipInputStream = new ZipInputStream(byteArrayInputStream)) {
-//            ZipEntry entry;
-//            while ((entry = zipInputStream.getNextEntry()) != null) {
-//                // Check if the entry is a file
-//                if (!entry.isDirectory()) {
-//                    String base64CompressedData = readZipEntry(zipInputStream);
-//                    String decompressedData = decompressAndDecode(base64CompressedData);
-//                    // Convert decompressed JSON data to a Map
-//                    ObjectMapper objectMapper = new ObjectMapper();
-//                    Map<String, Object> jsonData = objectMapper.readValue(decompressedData, new TypeReference<Map<String, Object>>() {
-//                    });
-//                    // Add the parsed JSON data to the result list
-//                    resultList.add(jsonData);
-//                }
-//            }
-//        }
-//        for (Map<String, Object> result : resultList) {
-//            if (result.containsKey("person")) {
-//                Object personField = result.get("person");
-//                Object clientIntakeField = result.get("clientIntake");
-//                Object riskStratificationField = result.get("riskStratification");
-//                Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
-//                Map<String, Object> riskStratificationData = (Map<String, Object>) riskStratificationField;
-////                Object clientIntakeField = result.get("clientIntake");
-//                if (personField instanceof Map) {
-//                    // Single person data
-//                    Map<String, Object> personData = (Map<String, Object>) personField;
-//                    System.out.println("Processing single person data: " + personData);
-//                    PersonDto personDto = convertToPersonDto(personData);
-//                    PersonResponseDto personResponseDto = personService.createPerson(personDto);
-//                    System.out.println("Created person: " + personResponseDto);
-//                    if (personResponseDto != null) {
-//                        Long patientId = personResponseDto.getId();
-//                       RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
-//                       riskStratificationDto.setPersonId(patientId);
-//                        RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-////                        if(riskStratificationResponseDto != null){
-////                            // sync htsclient
-////                            HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData);
-////                           htsClientRequestDto.setPersonId(riskStratificationResponseDto.getPersonId());
-////                           htsClientRequestDto.setPersonDto(personDto);
-////                           htsClientService.save(htsClientRequestDto);
-////                        }
-//                    }
-//
-//                } else if (personField instanceof List) {
-//                    // List of person data
-//                    List<Map<String, Object>> personList = (List<Map<String, Object>>) personField;
-//                    for (Map<String, Object> personData : personList) {
-//                        System.out.println("Processing person data from list: " + personData);
-//                        PersonDto personDto = convertToPersonDto(personData);
-//                        PersonResponseDto personResponseDto = personService.createPerson(personDto);
-//                        System.out.println("Created person: " + personResponseDto);
-//                        if (personResponseDto != null) {
-//                            Long patientId = personResponseDto.getId();
-//                            System.out.println("I got to before saving risk startification");
-//                            RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
-//                            riskStratificationDto.setPersonId(patientId);
-//                            RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-//                            System.out.println("I got to after saving risk startification");
-////                            if(riskStratificationResponseDto != null){
-////                                // sync htsclient
-////                                HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData);
-////                                htsClientRequestDto.setPersonId(riskStratificationResponseDto.getPersonId());
-////                                htsClientRequestDto.setPersonDto(personDto);
-////                                htsClientService.save(htsClientRequestDto);
-////                            }
-//                        }
-//                    }
-//                } else {
-//                    System.out.println("Unexpected type for 'person' field.");
-//                }
-//            } else {
-//                System.out.println("No 'person' field found in this result.");
-//
-//            }
-//        }
-//        return resultList;
-//    }
-
-
     public List<Map<String, Object>> processZipFile(byte[] fileBytes) throws IOException {
         List<Map<String, Object>> resultList = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
@@ -163,71 +76,72 @@ public class QRReaderService {
             }
         }
         if (!resultList.isEmpty()) {
-            // Access the first object in resultList
-            Map<String, Object> result = resultList.get(0);
-            if (result.containsKey("person")) {
-                Object personField = result.get("person");
-                Object clientIntakeField = result.get("clientIntake");
-                Object riskStratificationField = result.get("riskStratification");
-                Object preTestField = result.get("preTest");
-                Object requestResultField = result.get("RequestResult");
-                Object postTestField = result.get("postTest");
-                Object recencyField = result.get("recency");
-                Object elicitationField = result.get("elicitation");
-                Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
-                Map<String, Object> riskStratificationData = (Map<String, Object>) riskStratificationField;
-                Map<String, Object> preTestData = (Map<String, Object>) preTestField;
-                Map<String, Object> requestResultData = (Map<String, Object>) requestResultField;
-                Map<String, Object> postTestData = (Map<String, Object>) postTestField;
-                Map<String, Object> recencyData = (Map<String, Object>) recencyField;
-                Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
-                if (personField instanceof Map) {
-                    // Single person data
-                    Map<String, Object> personData = (Map<String, Object>) personField;
-//                    System.out.println("Processing single person data: " + personData);
-                    // Convert and save the person
-                    PersonDto personDto = convertToPersonDto(personData);
-                    PersonResponseDto personResponseDto = personService.createPerson(personDto);
-//                    System.out.println("Created person: " + personResponseDto);
-                    if (personResponseDto != null) {
-                        Long patientId = personResponseDto.getId();
-                        // Create and save the RiskStratificationDto
-                        RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
-                        riskStratificationDto.setPersonId(patientId);
-                        RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-                        // Sync HtsClient if RiskStratificationResponseDto is not null
-                        if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
-//                            System.out.println("Patient riskStratificationResponseDto.getCode(): " + riskStratificationResponseDto.getCode());
-                            HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
-                            htsClientRequestDto.setPersonId(patientId);
-                            htsClientRequestDto.setPersonDto(personDto);
-//                            htsClientRequestDto.setSource("Mobile");
-                            HtsClientDto htsClientDto = htsClientService.save(htsClientRequestDto);
-                            // sync preTest field id htsClientDto is null;
-                            if (htsClientDto != null & preTestField != null) {
-                                // convertPreTestJsonRequest to HtsPreTestCounselingDto
-                                HtsPreTestCounselingDto htsPreTestCounselingDto = createPreTestCounseling(preTestData, htsClientDto.getId(), patientId);
-                                htsClientService.updatePreTestCounseling(htsClientDto.getId(), htsPreTestCounselingDto);
-                            }
-                            if (htsClientDto != null & requestResultField != null) {
-//                              synchronized  request and result field
-                                HtsRequestResultDto htsRequestResultDto = createRequestResult(requestResultData, htsClientDto.getId(), patientId);
-                                htsClientService.updateRequestResult(htsClientDto.getId(), htsRequestResultDto);
-                            }
-                            if (htsClientDto != null & postTestField != null) {
-//                              synchronized post counselling  filed
-                                PostTestCounselingDto postTestCounselingDto = createPostTestCounseling(postTestData, htsClientDto.getId(), patientId);
-                                htsClientService.updatePostTestCounselingKnowledgeAssessment(htsClientDto.getId(), postTestCounselingDto);
+            // Iterate over all elements in resultList
+            for (Map<String, Object> result : resultList) {
+                if (result.containsKey("person")) {
+                    Object personField = result.get("person");
+                    Object clientIntakeField = result.get("clientIntake");
+                    Object riskStratificationField = result.get("riskStratification");
+                    Object preTestField = result.get("preTest");
+                    Object requestResultField = result.get("RequestResult");
+                    Object postTestField = result.get("postTest");
+                    Object recencyField = result.get("recency");
+                    Object elicitationField = result.get("elicitation");
 
-                            }
-                            if (htsClientDto != null & recencyField != null) {
-//                              synchronized recency filed
-                                HtsRecencyDto recencyDto = createRecency(recencyData, htsClientDto.getId(), patientId);
-                                htsClientService.updateRecency(htsClientDto.getId(), recencyDto);
-                            }
-                            if(htsClientDto != null & elicitationField !=null){
-                                IndexElicitationDto indexElicitationDto = createIndexElicitation(elicitationData, htsClientDto.getId());
-                                indexElicitationService.save(indexElicitationDto);
+                    // Safely cast fields to their expected types
+                    Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
+                    Map<String, Object> riskStratificationData = (Map<String, Object>) riskStratificationField;
+                    Map<String, Object> preTestData = (Map<String, Object>) preTestField;
+                    Map<String, Object> requestResultData = (Map<String, Object>) requestResultField;
+                    Map<String, Object> postTestData = (Map<String, Object>) postTestField;
+                    Map<String, Object> recencyData = (Map<String, Object>) recencyField;
+                    Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
+
+                    if (personField instanceof Map) {
+                        // Process single person data
+                        Map<String, Object> personData = (Map<String, Object>) personField;
+                        PersonDto personDto = convertToPersonDto(personData);
+                        PersonResponseDto personResponseDto = personService.createPerson(personDto);
+
+                        if (personResponseDto != null) {
+                            Long patientId = personResponseDto.getId();
+
+                            // Create and save the RiskStratificationDto
+                            RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
+                            riskStratificationDto.setPersonId(patientId);
+                            RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
+// Sync HtsClient if RiskStratificationResponseDto is not null
+                            if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
+                                HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
+                                htsClientRequestDto.setPersonId(patientId);
+                                htsClientRequestDto.setPersonDto(personDto);
+
+                                HtsClientDto htsClientDto = htsClientService.save(htsClientRequestDto);
+
+                                if (htsClientDto != null && preTestField != null) {
+                                    HtsPreTestCounselingDto htsPreTestCounselingDto = createPreTestCounseling(preTestData, htsClientDto.getId(), patientId);
+                                    htsClientService.updatePreTestCounseling(htsClientDto.getId(), htsPreTestCounselingDto);
+                                }
+
+                                if (htsClientDto != null && requestResultField != null) {
+                                    HtsRequestResultDto htsRequestResultDto = createRequestResult(requestResultData, htsClientDto.getId(), patientId);
+                                    htsClientService.updateRequestResult(htsClientDto.getId(), htsRequestResultDto);
+                                }
+
+                                if (htsClientDto != null && postTestField != null) {
+                                    PostTestCounselingDto postTestCounselingDto = createPostTestCounseling(postTestData, htsClientDto.getId(), patientId);
+                                    htsClientService.updatePostTestCounselingKnowledgeAssessment(htsClientDto.getId(), postTestCounselingDto);
+                                }
+
+                                if (htsClientDto != null && recencyField != null) {
+                                    HtsRecencyDto recencyDto = createRecency(recencyData, htsClientDto.getId(), patientId);
+                                    htsClientService.updateRecency(htsClientDto.getId(), recencyDto);
+                                }
+
+                                if (htsClientDto != null && elicitationField != null) {
+                                    IndexElicitationDto indexElicitationDto = createIndexElicitation(elicitationData, htsClientDto.getId());
+                                    indexElicitationService.save(indexElicitationDto);
+                                }
                             }
                         }
                     }
@@ -240,8 +154,7 @@ public class QRReaderService {
     private Long convertToLong(Object value) {
         if (value instanceof Number) {
             return ((Number) value).longValue();
-        }
-       else if (value instanceof Integer) {
+        } else if (value instanceof Integer) {
             return ((Integer) value).longValue();
         } else if (value instanceof Long) {
             return (Long) value;
@@ -415,8 +328,6 @@ public class QRReaderService {
 
 
     private RiskStratificationDto createRiskStratification(Map<String, Object> riskstratificationData) {
-//        System.out.println("I got here inside the risk stratification");
-//        System.out.println("riskstratificationData: " + riskstratificationData);
         String dobStr = (String) riskstratificationData.get("dob");
         LocalDate dob = dobStr != null ? LocalDate.parse(dobStr) : null;
 
@@ -438,8 +349,6 @@ public class QRReaderService {
     }
 
     private HtsPreTestCounselingDto createPreTestCounseling(Map<String, Object> preTestData, Long htsClientId, Long personId) {
-//        System.out.println("I got here inside the pre-test counseling creation");
-//        System.out.println("preTestData: " + preTestData);
         Object knowledgeAssessment = preTestData.get("knowledgeAssessment");
         Object riskAssessment = preTestData.get("riskAssessment");
         Object tbScreening = preTestData.get("tbScreening");
@@ -477,8 +386,10 @@ public class QRReaderService {
         Object cd4 = requestResultData.get("cd4");
 
         // Prep offered and accepted (default to null or false if not available)
-        Boolean prepOffered = (Boolean) requestResultData.getOrDefault("prepOffered", null);
-        Boolean prepAccepted = (Boolean) requestResultData.getOrDefault("prepAccepted", null);
+//        Boolean prepOffered = (Boolean) requestResultData.getOrDefault("prepOffered", null);
+//        Boolean prepAccepted = (Boolean) requestResultData.getOrDefault("prepAccepted", null);
+        Boolean prepOffered = convertToBoolean(requestResultData.getOrDefault("prepOffered", null));
+        Boolean prepAccepted = convertToBoolean(requestResultData.getOrDefault("prepAccepted", null));
         HtsRequestResultDto htsRequestResultDto = new HtsRequestResultDto(
                 htsClientId,
                 personId,
@@ -503,8 +414,6 @@ public class QRReaderService {
     }
 
     private PostTestCounselingDto createPostTestCounseling(Map<String, Object> postTestData, Long htsClientId, Long personId) {
-        System.out.println("I got here inside the post-test counseling creation");
-        System.out.println("postTestData: " + postTestData);
         // Extracting fields from the postTestData map
         Object postTestCounselingKnowledgeAssessment = postTestData.get("postTestCounselingKnowledgeAssessment");
         String source = (String) postTestData.get("source");
@@ -586,6 +495,5 @@ public class QRReaderService {
                 .uuid(uuid)
                 .build();
     }
-
 
 }
