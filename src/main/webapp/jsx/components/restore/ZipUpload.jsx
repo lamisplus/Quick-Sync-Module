@@ -17,8 +17,6 @@ import MatButton from "@material-ui/core/Button";
 import { makeStyles } from "@material-ui/core/styles";
 import SaveIcon from "@material-ui/icons/Save";
 import CancelIcon from "@material-ui/icons/Cancel";
-import { Alert } from "reactstrap";
-import { Spinner } from "reactstrap";
 import axios from "axios";
 import { token, url as baseUrl } from "../../../api";
 import { DropzoneArea } from "material-ui-dropzone";
@@ -61,7 +59,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const DatabaseRestore = (props) => {
+const ZipUpload = (props) => {
   const classes = useStyles();
   const [facilities, setFacilities] = useState([]);
   const [errors, setErrors] = useState({});
@@ -72,7 +70,6 @@ const DatabaseRestore = (props) => {
   });
 
   const validateInputs = () => {
-    console.log(upload.facilityId);
     let temp = { ...errors };
     temp.facilityId = upload.facilityId ? "" : "Facility name is required.";
 
@@ -129,28 +126,26 @@ const DatabaseRestore = (props) => {
 
   const uploadProcess = (e) => {
     e.preventDefault();
+    props.setProcessing(true)
 
     if (validateInputs()) {
       let fileName = upload.files.name;
-
       const formData = new FormData();
-
       formData.append("file", upload.files);
-
-      if (fileName.includes("patient") === true) {
+      
         axios
         .post(
-          `${baseUrl}quick-sync/import/person-data?facilityId=${upload.facilityId}`,
+          `${baseUrl}quick-sync/upload-client-zip`,
           formData,
           {
             headers: { Authorization: `Bearer ${token}` },
-            responseType: "blob",
           }
         )
         .then((response) => {
-          setLoading(false);
-          syncHistory();
-          toast.success("Patient Json uploaded successfully");
+            props.setProcessing(true)
+            setLoading(false);
+            syncHistory();
+            toast.success("Sync was successful!");
         })
         .catch((error) => {
           setLoading(false);
@@ -165,39 +160,7 @@ const DatabaseRestore = (props) => {
             toast.error("Something went wrong uploading. Please try again...");
           }
         });
-      }else if (fileName.includes("biometrics") === true) {
-        axios
-        .post(
-          `${baseUrl}quick-sync/import/biometric-data?facilityId=${upload.facilityId}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "blob",
-          }
-        )
-        .then((response) => {
-          setLoading(false);
-          syncHistory();
-          toast.success("Biometrics Json uploaded successfully");
-        })
-        .catch((error) => {
-          setLoading(false);
-          if (error.response && error.response.data) {
-            let errorMessage =
-              error.response.data.apierror &&
-              error.response.data.apierror.message !== ""
-                ? error.response.data.apierror.message
-                : "Something went wrong uploading, please try again";
-            toast.error(errorMessage);
-          } else {
-            toast.error("Something went wrong uploading. Please try again...");
-          }
-        });
-      }else {
-        return null;
-      }
     }
-
     props.togglestatus();
   };
 
@@ -210,8 +173,8 @@ const DatabaseRestore = (props) => {
         size="lg"
       >
         <Form>
-          <ModalHeader toggle={props.togglestatus}>
-            Upload JSON File
+          <ModalHeader className={{padding: '0 2%'}} toggle={props.togglestatus}>
+            Upload zip file
           </ModalHeader>
           <ModalBody>
             <Card>
@@ -255,8 +218,8 @@ const DatabaseRestore = (props) => {
                     <DropzoneArea
                       onChange={(files) => handleUploadChange(files)}
                       showFileNames="true"
-                      acceptedFiles={[".json"]}
-                      maxFileSize={"100000000"}
+                      acceptedFiles={[".zip"]}
+                      maxFileSize={"1000000000"}
                       filesLimit={1}
                     />
                   </Col>
@@ -294,4 +257,4 @@ const DatabaseRestore = (props) => {
   );
 };
 
-export default DatabaseRestore;
+export default ZipUpload;

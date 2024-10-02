@@ -27,6 +27,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import RestoreModal from "./restoreModal";
 import DownloadModal from "./DownloadModal";
+import { FolderZip, FolderZipOutlined, FolderZipTwoTone } from "@mui/icons-material";
+import ZipUpload from "./ZipUpload";
 
 const tableIcons = {
   Add: forwardRef((props, ref) => <AddBox {...props} ref={ref} />),
@@ -54,6 +56,7 @@ const tableIcons = {
 
 const RestoreList = (props) => {
   const [syncList, setSyncList] = useState([]);
+  const [modalZipUpload, setmodalZipUpload] = useState(false);
   const [modal, setModal] = useState(false);
   const [modalDownload, setModalDownload] = useState(false);
 
@@ -72,10 +75,10 @@ const RestoreList = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        console.log("sync",response.data)
-        setSyncList(response.data);
+        console.log("sync: ", response?.data)
+        setSyncList(response?.data);
       })
-      .catch((error) => {});
+      .catch((error) => { });
   }
 
   const syncDataBase = () => {
@@ -88,14 +91,14 @@ const RestoreList = (props) => {
 
   const PageTitle = ({ motherMenu, activeMenu, pageContent }) => {
     let path = window.location.pathname.split("/");
-  	return (
-  		<div className="row page-titles mx-0">
-  			<ol className="breadcrumb">
-  				<li className="breadcrumb-item active"><Link to={`/${path[path.length - 1]}`}>{motherMenu}</Link></li>
-  				<li className="breadcrumb-item  "><Link to={`/${path[path.length - 1]}`}>{activeMenu}</Link></li>
-  			</ol>
-  		</div>
-  	);
+    return (
+      <div className="row page-titles mx-0">
+        <ol className="breadcrumb">
+          <li className="breadcrumb-item active"><Link to={`/${path[path.length - 1]}`}>{motherMenu}</Link></li>
+          <li className="breadcrumb-item  "><Link to={`/${path[path.length - 1]}`}>{activeMenu}</Link></li>
+        </ol>
+      </div>
+    );
   };
 
 
@@ -108,9 +111,19 @@ const RestoreList = (props) => {
         className=" float-right mr-1"
         startIcon={<UploadIcon />}
         onClick={syncDataBase}
-        style={{backgroundColor:'#014d88',fontWeight:"bolder"}}
+        style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
       >
-        <span style={{ textTransform: "capitalize" }}>Upload </span>
+        <span style={{ textTransform: "capitalize" }}>Upload</span>
+      </Button>
+      <Button
+        variant="contained"
+        color="primary"
+        className=" float-right mr-1"
+        startIcon={<FolderZip />}
+        onClick={() => setmodalZipUpload(prev => !prev)}
+        style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
+      >
+        <span style={{ textTransform: "capitalize" }}>Zip Upload</span>
       </Button>
       <Button
         variant="contained"
@@ -118,7 +131,7 @@ const RestoreList = (props) => {
         className=" float-right mr-1"
         startIcon={<DownloadIcon />}
         onClick={syncDownload}
-        style={{backgroundColor:'#014d88',fontWeight:"bolder"}}
+        style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
       >
         <span style={{ textTransform: "capitalize" }}>Download </span>
       </Button>
@@ -129,7 +142,7 @@ const RestoreList = (props) => {
         icons={tableIcons}
         title="Quick Sync Upload List "
         columns={[
-          { title: "Facility Name",field: "name"},
+          { title: "Facility Name", field: "name" },
           { title: "Table Name", field: "url", filtering: false },
           { title: "No of records", field: "uploadSize", filtering: false },
           { title: "Date of Upload ", field: "date", filtering: false },
@@ -159,7 +172,8 @@ const RestoreList = (props) => {
           debounceInterval: 400,
         }}
       />
-      <RestoreModal modalstatus={modal} togglestatus={toggle} setSyncList={setSyncList}/>
+      <RestoreModal modalstatus={modal} togglestatus={toggle} setSyncList={setSyncList} />
+      <ZipUpload modalstatus={modalZipUpload} togglestatus={() => setmodalZipUpload(prev => !prev)} setSyncList={setSyncList} />
       <DownloadModal
         modalstatus={modalDownload}
         togglestatus={toggleDownload}
