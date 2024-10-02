@@ -75,7 +75,6 @@ const RestoreList = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        console.log("sync: ", response?.data)
         setSyncList(response?.data);
       })
       .catch((error) => { });

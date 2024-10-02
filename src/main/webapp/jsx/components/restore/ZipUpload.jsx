@@ -71,8 +71,6 @@ const ZipUpload = (props) => {
 
   const validateInputs = () => {
     let temp = { ...errors };
-    temp.facilityId = upload.facilityId ? "" : "Facility name is required.";
-
     setErrors({
       ...temp,
     });
@@ -118,7 +116,6 @@ const ZipUpload = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        console.log("sync restore",response.data)
         props.setSyncList(response.data);
       })
       .catch((error) => {});
@@ -126,8 +123,6 @@ const ZipUpload = (props) => {
 
   const uploadProcess = (e) => {
     e.preventDefault();
-    props.setProcessing(true)
-
     if (validateInputs()) {
       let fileName = upload.files.name;
       const formData = new FormData();
@@ -142,7 +137,6 @@ const ZipUpload = (props) => {
           }
         )
         .then((response) => {
-            props.setProcessing(true)
             setLoading(false);
             syncHistory();
             toast.success("Sync was successful!");
@@ -180,7 +174,7 @@ const ZipUpload = (props) => {
             <Card>
               <CardBody>
                 <Row>
-                  <Col md={12}>
+                  {/* <Col md={12}>
                     <FormGroup>
                       <Label for="exampleSelect">
                         Facility Name <span style={{ color: "red" }}> *</span>
@@ -213,7 +207,7 @@ const ZipUpload = (props) => {
                         ""
                       )}
                     </FormGroup>
-                  </Col>
+                  </Col> */}
                   <Col md={12}>
                     <DropzoneArea
                       onChange={(files) => handleUploadChange(files)}
