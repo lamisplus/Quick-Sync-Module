@@ -4,6 +4,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.common.errors.IllegalSaslStateException;
+import org.jetbrains.annotations.NotNull;
+import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
+import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
 import org.lamisplus.modules.hts.service.HtsClientService;
 import org.lamisplus.modules.hts.service.IndexElicitationService;
@@ -12,7 +16,17 @@ import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
 
 import org.lamisplus.modules.patient.service.PersonService;
+import org.lamisplus.modules.sync.domain.QuickSyncHistory;
+import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
+import org.lamisplus.modules.sync.repository.QuickSyncHistoryRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+import scala.Int;
 
 import java.io.*;
 import java.time.LocalDate;
@@ -32,6 +46,8 @@ public class QRReaderService {
     private final HtsClientService htsClientService;
     private final RiskStratificationService riskStratificationService;
     private final IndexElicitationService indexElicitationService;
+    private final QuickSyncHistoryRepository quickSyncHistoryRepository;
+    private final OrganisationUnitRepository organisationUnitRepository;
 
     private final ObjectMapper objectMapper;
 
@@ -54,9 +70,21 @@ public class QRReaderService {
         }
     }
 
-    public List<Map<String, Object>> processZipFile(byte[] fileBytes) throws IOException {
+
+    public List<Map<String, Object>> processZipFile(Long facilityId, MultipartFile multipartFile) throws IOException {
         List<Map<String, Object>> resultList = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
+        OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+        String fileName = multipartFile.getOriginalFilename();
+        int fileSizeInMB = (int) Math.ceil(multipartFile.getSize()/(1024.0 * 1024.0));
+        // check if the filename exist in quickSyn history
+        Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
+        if(fileExists){
+           throw new IllegalArgumentException("File with the name " + fileName + " has already been processed");
+        }
+
+        byte[] fileBytes = multipartFile.getBytes();
+
         // Convert the byte array to a ZipInputStream
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(fileBytes);
              ZipInputStream zipInputStream = new ZipInputStream(byteArrayInputStream)) {
@@ -105,12 +133,13 @@ public class QRReaderService {
 
                         if (personResponseDto != null) {
                             Long patientId = personResponseDto.getId();
-
+                            System.out.println(" PersonResponseDto : "+ patientId);
                             // Create and save the RiskStratificationDto
                             RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
                             riskStratificationDto.setPersonId(patientId);
+                            System.out.println("riskStratificationDto : "+ riskStratificationDto);
                             RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-// Sync HtsClient if RiskStratificationResponseDto is not null
+                             // Sync HtsClient if RiskStratificationResponseDto is not null
                             if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
                                 HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
                                 htsClientRequestDto.setPersonId(patientId);
@@ -147,7 +176,9 @@ public class QRReaderService {
                     }
                 }
             }
+            getQuickSyncHistoryDTO(multipartFile, facility, fileSizeInMB, "");
         }
+
         return resultList;
     }
 
@@ -496,4 +527,26 @@ public class QRReaderService {
                 .build();
     }
 
+
+    @NotNull
+    private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize, String tableName) {
+        QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
+                .status("completed")
+                .filename(file.getOriginalFilename())
+                .facilityName(facility.getName())
+                .tableName(tableName)
+                .fileSize(filesize)
+                .dateUpdated(LocalDateTime.now())
+                .build();
+        QuickSyncHistory quickSyncHistory = new QuickSyncHistory();
+        quickSyncHistory.setFilename(historyDTO.getFilename());
+        quickSyncHistory.setStatus("completed");
+        quickSyncHistory.setTableName(historyDTO.getTableName());
+        quickSyncHistory.setFileSize(historyDTO.getFileSize());
+        quickSyncHistory.setFilename(file.getOriginalFilename());
+        quickSyncHistory.setFacilityName(historyDTO.getFacilityName());
+        quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
+        quickSyncHistoryRepository.save(quickSyncHistory);
+        return historyDTO;
+    }
 }

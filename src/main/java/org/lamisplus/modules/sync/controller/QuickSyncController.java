@@ -79,11 +79,13 @@ public class QuickSyncController {
 
 
 	@PostMapping("/upload-client-zip")
-	public ResponseEntity<?> uploadZipFile(@RequestParam("file") MultipartFile file) {
+	public ResponseEntity<?> uploadZipFile(@RequestParam Long facilityId, @RequestParam("file") MultipartFile file) {
 		try {
-			byte[] fileBytes = file.getBytes();
-			List<Map<String, Object>> result = qrReaderService.processZipFile(fileBytes);
+//			byte[] fileBytes = file.getBytes();
+			List<Map<String, Object>> result = qrReaderService.processZipFile( facilityId,file);
 			return ResponseEntity.ok(result);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
 		} catch (IOException e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
 		}
