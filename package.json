@@ -125,7 +125,7 @@
     "yup": "^0.32.8"
   },
   "scripts": {
-    "start": "react-scripts --openssl-legacy-provider start",
+    "start": "react-scripts start",
     "jsreport": "jsreport-start",
     "build": "react-scripts build && xcopy /s /y build src\\main\\resources\\views\\static\\sync",
     "serve": "serve -s build",

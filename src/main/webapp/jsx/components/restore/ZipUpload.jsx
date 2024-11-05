@@ -89,7 +89,6 @@ const ZipUpload = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        // console.log(response.data);
         setFacilities(response.data.applicationUserOrganisationUnits);
       })
       .catch((error) => {
@@ -118,7 +117,6 @@ const ZipUpload = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        console.log("sync restore",response.data)
         props.setSyncList(response.data);
       })
       .catch((error) => {});
@@ -126,16 +124,13 @@ const ZipUpload = (props) => {
 
   const uploadProcess = (e) => {
     e.preventDefault();
-    props.setProcessing(true)
-
     if (validateInputs()) {
       let fileName = upload.files.name;
       const formData = new FormData();
       formData.append("file", upload.files);
-      
         axios
         .post(
-          `${baseUrl}quick-sync/upload-client-zip`,
+          `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
           formData,
           {
             headers: { Authorization: `Bearer ${token}` },
