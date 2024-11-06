@@ -122,41 +122,36 @@ const ZipUpload = (props) => {
       .catch((error) => {});
   }
 
-  const uploadProcess = (e) => {
+  const uploadProcess = async (e) => {
     e.preventDefault();
-    if (validateInputs()) {
-      let fileName = upload.files.name;
-      const formData = new FormData();
-      formData.append("file", upload.files);
-        axios
-        .post(
-          `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
+    if (!validateInputs()) return;
+    const formData = new FormData();
+    formData.append("file", upload.files);
+    try {
+      setLoading(true);
+      const response = await axios.post(
+         ` ${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
           formData,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { "Authorization": `Bearer ${token}` },
           }
-        )
-        .then((response) => {
-            props.setProcessing(true)
-            setLoading(false);
-            syncHistory();
-            toast.success("Sync was successful!");
-        })
-        .catch((error) => {
-          setLoading(false);
-          if (error.response && error.response.data) {
-            let errorMessage =
-              error.response.data.apierror &&
-              error.response.data.apierror.message !== ""
-                ? error.response.data.apierror.message
-                : "Something went wrong uploading, please try again";
-            toast.error(errorMessage);
-          } else {
-            toast.error("Something went wrong uploading. Please try again...");
-          }
-        });
+      );
+      syncHistory();
+      toast.success("Sync was successful!");
+
+    } catch (error) {
+      if (error.response?.status === 400 && error.response?.data) {
+        toast.error(error.response.data);
+        return;
+      }
+      const errorMessage = error.response?.data?.apierror?.message ||
+          "Something went wrong uploading. Please try again...";
+      toast.error(errorMessage);
+
+    } finally {
+      setLoading(false);
+      props.togglestatus();
     }
-    props.togglestatus();
   };
 
   return (
