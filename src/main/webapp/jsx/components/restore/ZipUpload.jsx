@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   ModalHeader,
@@ -12,27 +12,27 @@ import {
   FormGroup,
   Label,
   Input,
-} from "reactstrap";
-import MatButton from "@material-ui/core/Button";
-import { makeStyles } from "@material-ui/core/styles";
-import SaveIcon from "@material-ui/icons/Save";
-import CancelIcon from "@material-ui/icons/Cancel";
-import axios from "axios";
-import { token, url as baseUrl } from "../../../api";
-import { DropzoneArea } from "material-ui-dropzone";
-import SettingsBackupRestoreIcon from "@material-ui/icons/SettingsBackupRestore";
-import FileUploadIcon from "@mui/icons-material/FileUpload";
-import { toast } from "react-toastify";
+} from 'reactstrap';
+import MatButton from '@material-ui/core/Button';
+import { makeStyles } from '@material-ui/core/styles';
+import SaveIcon from '@material-ui/icons/Save';
+import CancelIcon from '@material-ui/icons/Cancel';
+import axios from 'axios';
+import { token, url as baseUrl } from '../../../api';
+import { DropzoneArea } from 'material-ui-dropzone';
+import SettingsBackupRestoreIcon from '@material-ui/icons/SettingsBackupRestore';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import { toast } from 'react-toastify';
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(theme => ({
   card: {
     margin: theme.spacing(20),
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
   },
   form: {
-    width: "100%", // Fix IE 11 issue.
+    width: '100%', // Fix IE 11 issue.
     marginTop: theme.spacing(3),
   },
   submit: {
@@ -50,33 +50,31 @@ const useStyles = makeStyles((theme) => ({
   },
 
   root: {
-    "& > *": {
+    '& > *': {
       margin: theme.spacing(1),
     },
   },
   input: {
-    display: "none",
+    display: 'none',
   },
 }));
 
-const ZipUpload = (props) => {
+const ZipUpload = props => {
   const classes = useStyles();
   const [facilities, setFacilities] = useState([]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [upload, setUpload] = useState({
-    facilityId: "",
+    facilityId: '',
     files: [],
   });
 
   const validateInputs = () => {
     let temp = { ...errors };
-    temp.facilityId = upload.facilityId ? "" : "Facility name is required.";
-
     setErrors({
       ...temp,
     });
-    return Object.values(temp).every((x) => x === "");
+    return Object.values(temp).every(x => x === '');
   };
 
   useEffect(() => {
@@ -91,12 +89,12 @@ const ZipUpload = (props) => {
       .then((response) => {
         setFacilities(response.data.applicationUserOrganisationUnits);
       })
-      .catch((error) => {
+      .catch(error => {
         //console.log(error);
       });
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = e => {
     const { name, value } = e.target;
     setUpload({
       ...upload,
@@ -104,7 +102,7 @@ const ZipUpload = (props) => {
     });
   };
 
-  const handleUploadChange = (files) => { 
+  const handleUploadChange = files => {
     setUpload({
       ...upload,
       files: files[0],
@@ -119,7 +117,7 @@ const ZipUpload = (props) => {
       .then((response) => {
         props.setSyncList(response.data);
       })
-      .catch((error) => {});
+      .catch(error => {});
   }
 
   const uploadProcess = async (e) => {
@@ -163,7 +161,10 @@ const ZipUpload = (props) => {
         size="lg"
       >
         <Form>
-          <ModalHeader className={{padding: '0 2%'}} toggle={props.togglestatus}>
+          <ModalHeader
+            className={{ padding: '0 2%' }}
+            toggle={props.togglestatus}
+          >
             Upload zip file
           </ModalHeader>
           <ModalBody>
@@ -173,7 +174,7 @@ const ZipUpload = (props) => {
                   <Col md={12}>
                     <FormGroup>
                       <Label for="exampleSelect">
-                        Facility Name <span style={{ color: "red" }}> *</span>
+                        Facility Name <span style={{ color: 'red' }}> *</span>
                       </Label>
                       <Input
                         type="select"
@@ -181,12 +182,12 @@ const ZipUpload = (props) => {
                         id="facility"
                         onChange={handleInputChange}
                         style={{
-                          border: "1px solid #014D88",
-                          borderRadius: "0.2rem",
+                          border: '1px solid #014D88',
+                          borderRadius: '0.2rem',
                         }}
                       >
-                        <option value={""}></option>
-                        {facilities.map((value) => (
+                        <option value={''}></option>
+                        {facilities.map(value => (
                           <option
                             key={value.id}
                             value={value.organisationUnitId}
@@ -195,21 +196,21 @@ const ZipUpload = (props) => {
                           </option>
                         ))}
                       </Input>
-                      {errors.facilityId !== "" ? (
-                        <span style={{ color: "#f85032", fontSize: "11px" }}>
+                      {errors.facilityId !== '' ? (
+                        <span style={{ color: '#f85032', fontSize: '11px' }}>
                           {errors.facilityId}
                         </span>
                       ) : (
-                        ""
+                        ''
                       )}
                     </FormGroup>
                   </Col>
                   <Col md={12}>
                     <DropzoneArea
-                      onChange={(files) => handleUploadChange(files)}
+                      onChange={files => handleUploadChange(files)}
                       showFileNames="true"
-                      acceptedFiles={[".zip"]}
-                      maxFileSize={"1000000000"}
+                      acceptedFiles={['.zip']}
+                      maxFileSize={'1000000000'}
                       filesLimit={1}
                     />
                   </Col>
