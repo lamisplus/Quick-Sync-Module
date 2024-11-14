@@ -2,7 +2,6 @@ package org.lamisplus.modules.sync.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONObject;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
@@ -36,10 +35,9 @@ public class QuickSyncController {
 			@RequestParam("facilityId") Long facility,
 			@RequestParam("startDate") LocalDate start,
 			@RequestParam("endDate") LocalDate end) throws IOException {
-			//messagingTemplate.convertAndSend("/topic/person-data", "start");
 			ByteArrayOutputStream baos = questionQuickSyncService.generatePersonData(response, facility, start, end);
 			setStream(baos, response);
-			//messagingTemplate.convertAndSend("/topic/person-data", "end");
+
 	}
 	
 	@PostMapping("/import/person-data")
@@ -57,10 +55,8 @@ public class QuickSyncController {
 	                             @RequestParam("facilityId") Long facility,
 	                             @RequestParam("startDate") LocalDate start,
 	                             @RequestParam("endDate") LocalDate end) throws IOException {
-		//messagingTemplate.convertAndSend("/topic/biometric-data", "start");
 		ByteArrayOutputStream baos = questionQuickSyncService.generateBiometricData(response, facility, start, end);
 		setStream(baos, response);
-		//messagingTemplate.convertAndSend("/topic/biometric-data", "end");
 	}
 	
 	@GetMapping("/history")
@@ -81,7 +77,6 @@ public class QuickSyncController {
 	@PostMapping("/upload-client-zip")
 	public ResponseEntity<?> uploadZipFile(@RequestParam Long facilityId, @RequestParam("file") MultipartFile file) {
 		try {
-//			byte[] fileBytes = file.getBytes();
 			List<Map<String, Object>> result = qrReaderService.processZipFile( facilityId,file);
 			return ResponseEntity.ok(result);
 		} catch (IllegalArgumentException e) {

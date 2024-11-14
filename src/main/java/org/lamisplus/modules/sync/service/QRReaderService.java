@@ -417,7 +417,6 @@ public class QRReaderService {
         Object cd4 = requestResultData.get("cd4");
 
         // Prep offered and accepted (default to null or false if not available)
-//        Boolean prepOffered = (Boolean) requestResultData.getOrDefault("prepOffered", null);
 //        Boolean prepAccepted = (Boolean) requestResultData.getOrDefault("prepAccepted", null);
         Boolean prepOffered = convertToBoolean(requestResultData.getOrDefault("prepOffered", null));
         Boolean prepAccepted = convertToBoolean(requestResultData.getOrDefault("prepAccepted", null));

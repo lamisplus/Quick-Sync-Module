@@ -27,8 +27,6 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import RestoreModal from "./restoreModal";
 import DownloadModal from "./DownloadModal";
-import { FolderZip, FolderZipOutlined, FolderZipTwoTone } from "@mui/icons-material";
-import ZipUpload from "./ZipUpload";
 
 const tableIcons = {
   Add: forwardRef((props, ref) => <AddBox {...props} ref={ref} />),
@@ -118,16 +116,6 @@ const RestoreList = (props) => {
         variant="contained"
         color="primary"
         className=" float-right mr-1"
-        startIcon={<FolderZip />}
-        onClick={() => setmodalZipUpload(prev => !prev)}
-        style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
-      >
-        <span style={{ textTransform: "capitalize" }}>Zip Upload</span>
-      </Button>
-      <Button
-        variant="contained"
-        color="primary"
-        className=" float-right mr-1"
         startIcon={<DownloadIcon />}
         onClick={syncDownload}
         style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
@@ -172,7 +160,6 @@ const RestoreList = (props) => {
         }}
       />
       <RestoreModal modalstatus={modal} togglestatus={toggle} setSyncList={setSyncList} />
-      <ZipUpload modalstatus={modalZipUpload} togglestatus={() => setmodalZipUpload(prev => !prev)} setSyncList={setSyncList} />
       <DownloadModal
         modalstatus={modalDownload}
         togglestatus={toggleDownload}
