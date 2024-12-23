@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
+import org.lamisplus.modules.sync.service.QRReaderService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -25,16 +28,16 @@ public class QuickSyncController {
 	private final SimpMessageSendingOperations messagingTemplate;
 	
 	private final PersonQuickSyncService questionQuickSyncService;
-	
+	private final QRReaderService qrReaderService;
+
 	@GetMapping("/export/person-data")
 	public void exportPersonData(HttpServletResponse response,
 			@RequestParam("facilityId") Long facility,
 			@RequestParam("startDate") LocalDate start,
 			@RequestParam("endDate") LocalDate end) throws IOException {
-			//messagingTemplate.convertAndSend("/topic/person-data", "start");
 			ByteArrayOutputStream baos = questionQuickSyncService.generatePersonData(response, facility, start, end);
 			setStream(baos, response);
-			//messagingTemplate.convertAndSend("/topic/person-data", "end");
+
 	}
 	
 	@PostMapping("/import/person-data")
@@ -52,10 +55,8 @@ public class QuickSyncController {
 	                             @RequestParam("facilityId") Long facility,
 	                             @RequestParam("startDate") LocalDate start,
 	                             @RequestParam("endDate") LocalDate end) throws IOException {
-		//messagingTemplate.convertAndSend("/topic/biometric-data", "start");
 		ByteArrayOutputStream baos = questionQuickSyncService.generateBiometricData(response, facility, start, end);
 		setStream(baos, response);
-		//messagingTemplate.convertAndSend("/topic/biometric-data", "end");
 	}
 	
 	@GetMapping("/history")
@@ -71,4 +72,20 @@ public class QuickSyncController {
 		outputStream.close();
 		response.flushBuffer();
 	}
+
+
+	@PostMapping("/upload-client-zip")
+	public ResponseEntity<?> uploadZipFile(@RequestParam Long facilityId, @RequestParam("file") MultipartFile file) {
+		try {
+			List<Map<String, Object>> result = qrReaderService.processZipFile( facilityId,file);
+			return ResponseEntity.ok(result);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+		} catch (IOException e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
+		}
+	}
+
+
+
 }

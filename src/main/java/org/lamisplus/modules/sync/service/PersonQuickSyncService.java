@@ -2,6 +2,7 @@ package org.lamisplus.modules.sync.service;
 
 
 
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONObject;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.biometric.domain.Biometric;
@@ -24,19 +26,32 @@ import org.lamisplus.modules.sync.domain.dto.PersonDTO;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.repository.QuickSyncHistoryRepository;
 import org.springframework.beans.BeanUtils;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Base64Utils;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
+//import java.awt.image.BufferedImage;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 
 @Service
 @RequiredArgsConstructor
@@ -52,10 +67,13 @@ public class PersonQuickSyncService {
 	private  final BiometricRepository biometricRepository;
 	
 	private final BiometricDTOMapper biometricDTOMapper;
-	
+
 	private final BiometricDTOToBiometricMapper biometricMapper;
-	
-	
+
+	private final ObjectMapper objectMapper = new ObjectMapper();
+
+
+
 	public Set<PersonDTO> getPersonDTO(Long facilityId, LocalDate start, LocalDate end) {
 		// not best practice
 		return personRepository.findAll().stream()
@@ -291,4 +309,8 @@ public class PersonQuickSyncService {
 		quickSyncHistoryRepository.save(quickSyncHistory);
 		return historyDTO;
 	}
+
+
 }
+
+

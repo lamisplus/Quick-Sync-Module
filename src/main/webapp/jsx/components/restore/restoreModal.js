@@ -72,7 +72,6 @@ const DatabaseRestore = (props) => {
   });
 
   const validateInputs = () => {
-    console.log(upload.facilityId);
     let temp = { ...errors };
     temp.facilityId = upload.facilityId ? "" : "Facility name is required.";
 
@@ -92,7 +91,6 @@ const DatabaseRestore = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        // console.log(response.data);
         setFacilities(response.data.applicationUserOrganisationUnits);
       })
       .catch((error) => {
@@ -108,7 +106,7 @@ const DatabaseRestore = (props) => {
     });
   };
 
-  const handleUploadChange = (files) => {
+  const handleUploadChange = (files) => { 
     setUpload({
       ...upload,
       files: files[0],
@@ -121,7 +119,6 @@ const DatabaseRestore = (props) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
-        console.log("sync restore",response.data)
         props.setSyncList(response.data);
       })
       .catch((error) => {});
@@ -193,7 +190,36 @@ const DatabaseRestore = (props) => {
             toast.error("Something went wrong uploading. Please try again...");
           }
         });
-      }else {
+      }
+      else if (fileName.includes("hts") === true) {
+        axios
+            .post(
+                `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
+                formData,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+            )
+            .then((response) => {
+              setLoading(false);
+              syncHistory();
+              toast.success("HTS sync successfully");
+            })
+            .catch((error) => {
+              setLoading(false);
+              if (error.response && error.response?.data) {
+                let errorMessage =
+                    error.response?.data &&
+                    error.response.data !== ""
+                        ? error.response?.data
+                        : "Something went wrong uploading, please try again";
+                toast.error(errorMessage);
+              } else {
+                toast.error("Something went wrong uploading. Please try again...");
+              }
+            });
+      }
+      else {
         return null;
       }
     }
@@ -255,7 +281,7 @@ const DatabaseRestore = (props) => {
                     <DropzoneArea
                       onChange={(files) => handleUploadChange(files)}
                       showFileNames="true"
-                      acceptedFiles={[".json"]}
+                      acceptedFiles={[".json", ".zip"]}
                       maxFileSize={"100000000"}
                       filesLimit={1}
                     />
