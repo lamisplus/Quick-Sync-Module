@@ -29,6 +29,8 @@ import scala.Int;
 import java.io.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
@@ -46,6 +48,7 @@ public class QRReaderService {
     private final IndexElicitationService indexElicitationService;
     private final FamilyIndexTestingService familyIndexTestingService;
     private final ClientReferralService clientReferralService;
+    private final PNSService pnsService;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
 
@@ -80,7 +83,7 @@ public class QRReaderService {
         // check if the filename exist in quickSyn history
         Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
         if(fileExists){
-           throw new IllegalArgumentException("File with the name " + fileName + " has already been processed");
+            throw new IllegalArgumentException("File with the name " + fileName + " has already been processed");
         }
 
         byte[] fileBytes = multipartFile.getBytes();
@@ -117,7 +120,7 @@ public class QRReaderService {
                     Object elicitationField = result.get("elicitation");
                     Object familyIndexTestingField = result.get("familyIndexTesting");
                     Object htsClientReferralField = result.get("htsClientReferral");
-
+                    Object partnerNotificationServicesField = result.get("partnerNotificationServices");
 
                     // Safely cast fields to their expected types
                     Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
@@ -129,6 +132,7 @@ public class QRReaderService {
                     Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
                     Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
                     Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
+                    Map<String, Object> partnerNotificationServicesData = (Map<String, Object>) partnerNotificationServicesField;
 
                     if (personField instanceof Map) {
                         // Process single person data
@@ -144,7 +148,7 @@ public class QRReaderService {
                             riskStratificationDto.setPersonId(patientId);
                             System.out.println("riskStratificationDto : "+ riskStratificationDto);
                             RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-                             // Sync HtsClient if RiskStratificationResponseDto is not null
+                            // Sync HtsClient if RiskStratificationResponseDto is not null
                             if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
                                 HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
                                 htsClientRequestDto.setPersonId(patientId);
@@ -183,6 +187,10 @@ public class QRReaderService {
                                 if (htsClientDto != null && htsClientReferralField != null) {
                                     HtsClientReferralRequestDTO htsClientReferralRequestDTO  = createHtsClientReferral(htsClientReferralData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
                                     clientReferralService.registerClientReferralForm(htsClientReferralRequestDTO);
+                                }
+                                if (htsClientDto != null && partnerNotificationServicesField != null) {
+                                    PersonalNotificationServiceRequestDTO personalNotificationServiceRequestDTO  = createPartnerNotificationServices(partnerNotificationServicesData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
+                                    pnsService.save(personalNotificationServiceRequestDTO);
                                 }
                             }
                         }
@@ -635,12 +643,57 @@ public class QRReaderService {
         dto.setReferredTo(referredTo);
         dto.setServiceNeeded(serviceNeeded);
         return dto;
+    }
+    private PersonalNotificationServiceRequestDTO createPartnerNotificationServices(Map<String, Object> pnsData,String htsClientUuid, Long htsClientId) {
+        PersonalNotificationServiceRequestDTO dto = new PersonalNotificationServiceRequestDTO();
+        Map<String, Object> htsClientInfo = (Map<String, Object>) pnsData.get("htsClientInformation");
+        Map<String, Object> contactTracing = (Map<String, Object>) pnsData.get("contactTracing");
+        Map<String, Object> violence = (Map<String, Object>) pnsData.get("intermediatePartnerViolence");
 
+        dto.setHtsClientId(htsClientId);
+        dto.setAcceptedHts(String.valueOf(pnsData.get("acceptedHts")));
+        dto.setAcceptedPns((String) pnsData.get("acceptedPns"));
+        dto.setAddress((String) pnsData.get("address"));
+        dto.setAlternatePhoneNumber((String) pnsData.get("alternatePhoneNumber"));
+        dto.setDateEnrollmentOnART(parseDate(pnsData.get("dateEnrollmentOnART")));
+        dto.setDateOfElicitation(parseDate(pnsData.get("dateOfElicitation")));
+        dto.setDatePartnerTested(parseDate(pnsData.get("datePartnerTested")));
+        dto.setDob(parseDate(pnsData.get("dob")));
+        dto.setFirstName((String) pnsData.get("firstName"));
+        dto.setHivTestResult((String) pnsData.get("hivTestResult"));
+        dto.setIndexClientId((String) pnsData.get("indexClientId"));
+        dto.setKnownHivPositive((String) pnsData.get("knownHivPositive"));
+        dto.setLastName((String) pnsData.get("lastName"));
+        dto.setMiddleName((String) pnsData.get("middleName"));
+        dto.setNotificationMethod(String.valueOf(pnsData.get("notificationMethod")));
+        dto.setOfferedPns((String) pnsData.get("offeredPns"));
+        dto.setPartnerId((String) pnsData.get("partnerId"));
+        dto.setPhoneNumber((String) pnsData.get("phoneNumber"));
+        dto.setReasonForDecline((String) pnsData.get("reasonForDecline"));
+        dto.setRelationshipToIndexClient((String) pnsData.get("relationshipToIndexClient"));
+        dto.setSex(String.valueOf(pnsData.get("sex")));
+        dto.setContactTracing(contactTracing);
+        dto.setHtsClientInformation(htsClientInfo);
+        dto.setIntermediatePartnerViolence(violence);
+        return dto;
     }
 
     private LocalDate parseDate(Object dateObj) {
-        return dateObj != null ? LocalDate.parse(dateObj.toString()) : null;
+        if (dateObj == null) {
+            return null;
+        }
+        String dateStr = dateObj.toString().trim();
+        if (dateStr.isEmpty()) {
+            return null;
+        }
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+            return LocalDate.parse(dateStr, formatter);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
+
 
     private Integer convertToInteger(Object obj) {
         try {
