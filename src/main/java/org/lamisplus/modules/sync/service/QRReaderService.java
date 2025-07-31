@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
+import org.lamisplus.modules.hts.service.FamilyIndexTestingService;
 import org.lamisplus.modules.hts.service.HtsClientService;
 import org.lamisplus.modules.hts.service.IndexElicitationService;
 import org.lamisplus.modules.hts.service.RiskStratificationService;
@@ -46,6 +47,7 @@ public class QRReaderService {
     private final HtsClientService htsClientService;
     private final RiskStratificationService riskStratificationService;
     private final IndexElicitationService indexElicitationService;
+    private final FamilyIndexTestingService familyIndexTestingService;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
 
@@ -85,7 +87,7 @@ public class QRReaderService {
 
         byte[] fileBytes = multipartFile.getBytes();
 
-        // Convert the byte array to a ZipInputStream
+        // Convert the byte array to a ZipInputStream3
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(fileBytes);
              ZipInputStream zipInputStream = new ZipInputStream(byteArrayInputStream)) {
             ZipEntry entry;
@@ -115,6 +117,8 @@ public class QRReaderService {
                     Object postTestField = result.get("postTest");
                     Object recencyField = result.get("recency");
                     Object elicitationField = result.get("elicitation");
+                    Object familyIndexTestingField = result.get("familyIndexTesting");
+
 
                     // Safely cast fields to their expected types
                     Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
@@ -124,6 +128,7 @@ public class QRReaderService {
                     Map<String, Object> postTestData = (Map<String, Object>) postTestField;
                     Map<String, Object> recencyData = (Map<String, Object>) recencyField;
                     Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
+                    Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
 
                     if (personField instanceof Map) {
                         // Process single person data
@@ -171,6 +176,11 @@ public class QRReaderService {
                                     IndexElicitationDto indexElicitationDto = createIndexElicitation(elicitationData, htsClientDto.getId());
                                     indexElicitationService.save(indexElicitationDto);
                                 }
+                                if (htsClientDto != null && familyIndexTestingField != null) {
+                                    FamilyIndexTestingRequestDTO familyIndexTestingRequestDTO = createFamilyIndexTesting(familyIndexTestingData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
+                                    familyIndexTestingService.save(familyIndexTestingRequestDTO);
+                                }
+
                             }
                         }
                     }
@@ -524,6 +534,85 @@ public class QRReaderService {
                 .source("Mobile")
                 .uuid(uuid)
                 .build();
+    }
+    private FamilyIndexTestingRequestDTO createFamilyIndexTesting(Map<String, Object> familyIndexTestingData, String htsClientUuid, Long htsClientId) {
+        String address = (String) familyIndexTestingData.get("address");
+        Integer age = convertToInteger(familyIndexTestingData.get("age"));
+        String alternatePhoneNumber = (String) familyIndexTestingData.get("alternatePhoneNumber");
+        String contactId = (String) familyIndexTestingData.get("contactId");
+        LocalDate dateClientEnrolledOnTreatment = parseDate(familyIndexTestingData.get("dateClientEnrolledOnTreatment"));
+        LocalDate dateIndexClientConfirmedHivPositiveTestResult = parseDate(familyIndexTestingData.get("dateIndexClientConfirmedHivPositiveTestResult"));
+        LocalDate dateOfBirth = parseDate(familyIndexTestingData.get("dateOfBirth"));
+        String facilityName = (String) familyIndexTestingData.get("facilityName");
+        String familyIndexClient = (String) familyIndexTestingData.get("familyIndexClient");
+        String indexClientId = (String) familyIndexTestingData.get("indexClientId");
+        String isClientCurrentlyOnHivTreatment =  (String) familyIndexTestingData.get("isClientCurrentlyOnHivTreatment");
+        Double latitude = convertToDouble(familyIndexTestingData.get("latitude"));
+        Double longitude = convertToDouble(familyIndexTestingData.get("longitude"));
+        String lga = (String) familyIndexTestingData.get("lga");
+        Long maritalStatus = convertToLong(familyIndexTestingData.get("maritalStatus"));
+        String name = (String) familyIndexTestingData.get("name");
+        String phoneNumber = (String) familyIndexTestingData.get("phoneNumber");
+        String recencyTesting = (String) familyIndexTestingData.get("recencyTesting");
+        String setting = (String) familyIndexTestingData.get("setting");
+        Long sex = convertToLong(familyIndexTestingData.get("sex"));
+        Long state = convertToLong(familyIndexTestingData.get("state"));
+        Object extra = familyIndexTestingData.get("extra");
+        String virallyUnSuppressed = (String)  familyIndexTestingData.get("virallyUnSuppressed");
+        LocalDate visitDate = parseDate(familyIndexTestingData.get("visitDate"));
+        String willingToHaveChildrenTestedElseWhere = (String) familyIndexTestingData.get("willingToHaveChildrenTestedElseWhere");
+        String source = (String) familyIndexTestingData.get("source");
+
+        // You can expand this to map nested DTOs as needed
+
+        return FamilyIndexTestingRequestDTO.builder()
+                .htsClientId(htsClientId)
+                .extra(extra)
+                .htsClientUuid(htsClientUuid)
+                .age(String.valueOf(age))
+                .alternatePhoneNumber(alternatePhoneNumber)
+//                .contactId(contactId)
+                .dateClientEnrolledOnTreatment(String.valueOf(dateClientEnrolledOnTreatment))
+                .dateIndexClientConfirmedHivPositiveTestResult(dateIndexClientConfirmedHivPositiveTestResult)
+                .dateOfBirth(dateOfBirth)
+                .facilityName(facilityName)
+                .familyIndexClient(familyIndexClient)
+                .indexClientId(indexClientId)
+                .isClientCurrentlyOnHivTreatment(String.valueOf(isClientCurrentlyOnHivTreatment))
+//                .latitude(latitude)
+//                .longitude(longitude)
+                .lga(lga)
+                .maritalStatus(String.valueOf(maritalStatus))
+                .name(name)
+                .phoneNumber(phoneNumber)
+                .recencyTesting(recencyTesting)
+                .setting(setting)
+                .sex(String.valueOf(sex))
+                .state(String.valueOf(state))
+                .virallyUnSuppressed(String.valueOf(virallyUnSuppressed))
+                .visitDate(visitDate)
+                .willingToHaveChildrenTestedElseWhere(String.valueOf(willingToHaveChildrenTestedElseWhere))
+//                .source(source)
+                .build();
+    }
+    private LocalDate parseDate(Object dateObj) {
+        return dateObj != null ? LocalDate.parse(dateObj.toString()) : null;
+    }
+
+    private Integer convertToInteger(Object obj) {
+        try {
+            return obj != null ? Integer.parseInt(obj.toString()) : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Double convertToDouble(Object obj) {
+        try {
+            return obj != null ? Double.parseDouble(obj.toString()) : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
 
