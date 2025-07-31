@@ -9,10 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
-import org.lamisplus.modules.hts.service.FamilyIndexTestingService;
-import org.lamisplus.modules.hts.service.HtsClientService;
-import org.lamisplus.modules.hts.service.IndexElicitationService;
-import org.lamisplus.modules.hts.service.RiskStratificationService;
+import org.lamisplus.modules.hts.service.*;
 import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
 
@@ -48,6 +45,7 @@ public class QRReaderService {
     private final RiskStratificationService riskStratificationService;
     private final IndexElicitationService indexElicitationService;
     private final FamilyIndexTestingService familyIndexTestingService;
+    private final ClientReferralService clientReferralService;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
 
@@ -118,6 +116,7 @@ public class QRReaderService {
                     Object recencyField = result.get("recency");
                     Object elicitationField = result.get("elicitation");
                     Object familyIndexTestingField = result.get("familyIndexTesting");
+                    Object htsClientReferralField = result.get("htsClientReferral");
 
 
                     // Safely cast fields to their expected types
@@ -129,6 +128,7 @@ public class QRReaderService {
                     Map<String, Object> recencyData = (Map<String, Object>) recencyField;
                     Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
                     Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
+                    Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
 
                     if (personField instanceof Map) {
                         // Process single person data
@@ -180,7 +180,10 @@ public class QRReaderService {
                                     FamilyIndexTestingRequestDTO familyIndexTestingRequestDTO = createFamilyIndexTesting(familyIndexTestingData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
                                     familyIndexTestingService.save(familyIndexTestingRequestDTO);
                                 }
-
+                                if (htsClientDto != null && htsClientReferralField != null) {
+                                    HtsClientReferralRequestDTO htsClientReferralRequestDTO  = createHtsClientReferral(htsClientReferralData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
+                                    clientReferralService.registerClientReferralForm(htsClientReferralRequestDTO);
+                                }
                             }
                         }
                     }
@@ -561,7 +564,7 @@ public class QRReaderService {
         String virallyUnSuppressed = (String)  familyIndexTestingData.get("virallyUnSuppressed");
         LocalDate visitDate = parseDate(familyIndexTestingData.get("visitDate"));
         String willingToHaveChildrenTestedElseWhere = (String) familyIndexTestingData.get("willingToHaveChildrenTestedElseWhere");
-        String source = (String) familyIndexTestingData.get("source");
+//        String source = (String) familyIndexTestingData.get("source");
 
         // You can expand this to map nested DTOs as needed
 
@@ -595,6 +598,46 @@ public class QRReaderService {
 //                .source(source)
                 .build();
     }
+    private HtsClientReferralRequestDTO createHtsClientReferral(Map<String, Object> referralData, String htsClientUuid, Long htsClientId) {
+        String addressOfReceivingFacility = (String) referralData.get("addressOfReceivingFacility");
+        String addressOfReferringFacility = (String) referralData.get("addressOfReferringFacility");
+        String comments = (String) referralData.get("comments");
+        LocalDate dateVisit = parseDate(referralData.get("dateVisit"));
+        String middleName = (String) referralData.get("middleName");
+        String nameOfContactPerson = (String) referralData.get("nameOfContactPerson");
+        String nameOfPersonReferringClient = (String) referralData.get("nameOfPersonReferringClient");
+        String nameOfReceivingFacility = (String) referralData.get("nameOfReceivingFacility");
+        String nameOfReferringFacility = (String) referralData.get("nameOfReferringFacility");
+        String phoneNoOfReceivingFacility = (String) referralData.get("phoneNoOfReceivingFacility");
+        String phoneNoOfReferringFacility = (String) referralData.get("phoneNoOfReferringFacility");
+        String receivingFacilityLgaName = (String) referralData.get("receivingFacilityLgaName");
+        String receivingFacilityStateName = (String) referralData.get("receivingFacilityStateName");
+        String referredFromFacility = (String) referralData.get("referredFromFacility");
+        String referredTo = (String) referralData.get("referredTo");
+        Map<String, Object> serviceNeeded = (Map<String, Object>) referralData.get("serviceNeeded");
+
+        HtsClientReferralRequestDTO dto = new HtsClientReferralRequestDTO();
+        dto.setHtsClientUuid(htsClientUuid);
+        dto.setHtsClientId(htsClientId);
+        dto.setAddressOfReceivingFacility(addressOfReceivingFacility);
+        dto.setAddressOfReferringFacility(addressOfReferringFacility);
+        dto.setComments(comments);
+        dto.setDateVisit(dateVisit);
+        dto.setNameOfContactPerson(nameOfContactPerson);
+        dto.setNameOfPersonReferringClient(nameOfPersonReferringClient);
+        dto.setNameOfReceivingFacility(nameOfReceivingFacility);
+        dto.setNameOfReferringFacility(nameOfReferringFacility);
+        dto.setPhoneNoOfReceivingFacility(phoneNoOfReceivingFacility);
+        dto.setPhoneNoOfReferringFacility(phoneNoOfReferringFacility);
+        dto.setReceivingFacilityLgaName(receivingFacilityLgaName);
+        dto.setReceivingFacilityStateName(receivingFacilityStateName);
+        dto.setReferredFromFacility(referredFromFacility);
+        dto.setReferredTo(referredTo);
+        dto.setServiceNeeded(serviceNeeded);
+        return dto;
+
+    }
+
     private LocalDate parseDate(Object dateObj) {
         return dateObj != null ? LocalDate.parse(dateObj.toString()) : null;
     }
