@@ -26,7 +26,7 @@ import SettingsBackupRestoreIcon from "@material-ui/icons/SettingsBackupRestore"
 import FileUploadIcon from "@mui/icons-material/FileUpload";
 import { toast } from "react-toastify";
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(theme => ({
   card: {
     margin: theme.spacing(20),
     display: "flex",
@@ -61,7 +61,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const DatabaseRestore = (props) => {
+const DatabaseRestore = props => {
   const classes = useStyles();
   const [facilities, setFacilities] = useState([]);
   const [errors, setErrors] = useState({});
@@ -78,7 +78,7 @@ const DatabaseRestore = (props) => {
     setErrors({
       ...temp,
     });
-    return Object.values(temp).every((x) => x === "");
+    return Object.values(temp).every(x => x === "");
   };
 
   useEffect(() => {
@@ -90,15 +90,15 @@ const DatabaseRestore = (props) => {
       .get(`${baseUrl}account`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((response) => {
+      .then(response => {
         setFacilities(response.data.applicationUserOrganisationUnits);
       })
-      .catch((error) => {
+      .catch(error => {
         //console.log(error);
       });
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = e => {
     const { name, value } = e.target;
     setUpload({
       ...upload,
@@ -106,7 +106,7 @@ const DatabaseRestore = (props) => {
     });
   };
 
-  const handleUploadChange = (files) => { 
+  const handleUploadChange = files => {
     setUpload({
       ...upload,
       files: files[0],
@@ -118,15 +118,14 @@ const DatabaseRestore = (props) => {
       .get(`${baseUrl}quick-sync/history`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((response) => {
+      .then(response => {
         props.setSyncList(response.data);
       })
-      .catch((error) => {});
+      .catch(error => {});
   }
 
-  const uploadProcess = (e) => {
+  const uploadProcess = e => {
     e.preventDefault();
-
     if (validateInputs()) {
       let fileName = upload.files.name;
 
@@ -136,90 +135,96 @@ const DatabaseRestore = (props) => {
 
       if (fileName.includes("patient") === true) {
         axios
-        .post(
-          `${baseUrl}quick-sync/import/person-data?facilityId=${upload.facilityId}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "blob",
-          }
-        )
-        .then((response) => {
-          setLoading(false);
-          syncHistory();
-          toast.success("Patient Json uploaded successfully");
-        })
-        .catch((error) => {
-          setLoading(false);
-          if (error.response && error.response.data) {
-            let errorMessage =
-              error.response.data.apierror &&
-              error.response.data.apierror.message !== ""
-                ? error.response.data.apierror.message
-                : "Something went wrong uploading, please try again";
-            toast.error(errorMessage);
-          } else {
-            toast.error("Something went wrong uploading. Please try again...");
-          }
-        });
-      }else if (fileName.includes("biometrics") === true) {
+          .post(
+            `${baseUrl}quick-sync/import/person-data?facilityId=${upload.facilityId}`,
+            formData,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: "blob",
+            }
+          )
+          .then(response => {
+            setLoading(false);
+            syncHistory();
+            toast.success("Patient Json uploaded successfully");
+          })
+          .catch(error => {
+            setLoading(false);
+            if (error.response && error.response.data) {
+              let errorMessage =
+                error.response.data.apierror &&
+                error.response.data.apierror.message !== ""
+                  ? error.response.data.apierror.message
+                  : "Something went wrong uploading, please try again";
+              toast.error(errorMessage);
+            } else {
+              toast.error(
+                "Something went wrong uploading. Please try again..."
+              );
+            }
+          });
+      } else if (fileName.includes("biometrics") === true) {
         axios
-        .post(
-          `${baseUrl}quick-sync/import/biometric-data?facilityId=${upload.facilityId}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "blob",
-          }
-        )
-        .then((response) => {
-          setLoading(false);
-          syncHistory();
-          toast.success("Biometrics Json uploaded successfully");
-        })
-        .catch((error) => {
-          setLoading(false);
-          if (error.response && error.response.data) {
-            let errorMessage =
-              error.response.data.apierror &&
-              error.response.data.apierror.message !== ""
-                ? error.response.data.apierror.message
-                : "Something went wrong uploading, please try again";
-            toast.error(errorMessage);
-          } else {
-            toast.error("Something went wrong uploading. Please try again...");
-          }
-        });
-      }
-      else if (fileName.includes("hts") === true) {
+          .post(
+            `${baseUrl}quick-sync/import/biometric-data?facilityId=${upload.facilityId}`,
+            formData,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: "blob",
+            }
+          )
+          .then(response => {
+            setLoading(false);
+            syncHistory();
+            toast.success("Biometrics Json uploaded successfully");
+          })
+          .catch(error => {
+            setLoading(false);
+            if (error.response && error.response.data) {
+              let errorMessage =
+                error.response.data.apierror &&
+                error.response.data.apierror.message !== ""
+                  ? error.response.data.apierror.message
+                  : "Something went wrong uploading, please try again";
+              toast.error(errorMessage);
+            } else {
+              toast.error(
+                "Something went wrong uploading. Please try again..."
+              );
+            }
+          });
+      } else if (fileName.includes("hts") === true) {
         axios
-            .post(
-                `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
-                formData,
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-            )
-            .then((response) => {
-              setLoading(false);
-              syncHistory();
-              toast.success("HTS sync successfully");
-            })
-            .catch((error) => {
-              setLoading(false);
-              if (error.response && error.response?.data) {
-                let errorMessage =
-                    error.response?.data &&
-                    error.response.data !== ""
-                        ? error.response?.data
-                        : "Something went wrong uploading, please try again";
-                toast.error(errorMessage);
-              } else {
-                toast.error("Something went wrong uploading. Please try again...");
-              }
-            });
-      }
-      else {
+          .post(
+            `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
+            formData,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          )
+          .then(response => {
+            setLoading(false);
+            syncHistory();
+            toast.success("HTS sync successfully");
+          })
+          .catch(error => {
+            setLoading(false);
+            if (error.response && error.response?.data) {
+              let errorMessage =
+                error.response?.data && error.response.data !== ""
+                  ? error.response?.data
+                  : "Something went wrong uploading, please try again";
+              toast.error(errorMessage);
+            } else {
+              toast.error(
+                "Something went wrong uploading. Please try again..."
+              );
+            }
+          });
+      } else {
+        toast.error(
+          "Upload failed. Please verify the filename format and retry."
+        );
         return null;
       }
     }
@@ -259,7 +264,7 @@ const DatabaseRestore = (props) => {
                         }}
                       >
                         <option value={""}></option>
-                        {facilities.map((value) => (
+                        {facilities.map(value => (
                           <option
                             key={value.id}
                             value={value.organisationUnitId}
@@ -279,7 +284,7 @@ const DatabaseRestore = (props) => {
                   </Col>
                   <Col md={12}>
                     <DropzoneArea
-                      onChange={(files) => handleUploadChange(files)}
+                      onChange={files => handleUploadChange(files)}
                       showFileNames="true"
                       acceptedFiles={[".json", ".zip"]}
                       maxFileSize={"100000000"}
