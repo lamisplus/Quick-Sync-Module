@@ -23,8 +23,8 @@ import ViewColumn from "@material-ui/icons/ViewColumn";
 
 import Button from "@material-ui/core/Button";
 import { Badge, Spinner } from "reactstrap";
-import DownloadIcon from '@mui/icons-material/Download';
-import UploadIcon from '@mui/icons-material/Upload';
+import DownloadIcon from "@mui/icons-material/Download";
+import UploadIcon from "@mui/icons-material/Upload";
 import RestoreModal from "./restoreModal";
 import DownloadModal from "./DownloadModal";
 
@@ -52,7 +52,7 @@ const tableIcons = {
   ViewColumn: forwardRef((props, ref) => <ViewColumn {...props} ref={ref} />),
 };
 
-const RestoreList = (props) => {
+const RestoreList = props => {
   const [syncList, setSyncList] = useState([]);
   const [modalZipUpload, setmodalZipUpload] = useState(false);
   const [modal, setModal] = useState(false);
@@ -64,7 +64,6 @@ const RestoreList = (props) => {
 
   useEffect(() => {
     syncHistory();
-
   }, []);
 
   async function syncHistory() {
@@ -72,10 +71,10 @@ const RestoreList = (props) => {
       .get(`${baseUrl}quick-sync/history`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((response) => {
+      .then(response => {
         setSyncList(response?.data);
       })
-      .catch((error) => { });
+      .catch(error => {});
   }
 
   const syncDataBase = () => {
@@ -91,14 +90,17 @@ const RestoreList = (props) => {
     return (
       <div className="row page-titles mx-0">
         <ol className="breadcrumb">
-          <li className="breadcrumb-item active"><Link to={`/${path[path.length - 1]}`}>{motherMenu}</Link></li>
-          <li className="breadcrumb-item  "><Link to={`/${path[path.length - 1]}`}>{activeMenu}</Link></li>
+          <li className="breadcrumb-item active">
+            <Link to={`/${path[path.length - 1]}`}>{motherMenu}</Link>
+          </li>
+          <li className="breadcrumb-item  ">
+            <Link to={`/${path[path.length - 1]}`}>{activeMenu}</Link>
+          </li>
         </ol>
       </div>
     );
   };
-
-
+  console.log("syncList: ", syncList);
   return (
     <>
       <PageTitle activeMenu="Quick Sync" motherMenu="Sync " />
@@ -108,7 +110,7 @@ const RestoreList = (props) => {
         className=" float-right mr-1"
         startIcon={<UploadIcon />}
         onClick={syncDataBase}
-        style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
+        style={{ backgroundColor: "#014d88", fontWeight: "bolder" }}
       >
         <span style={{ textTransform: "capitalize" }}>Upload</span>
       </Button>
@@ -118,7 +120,7 @@ const RestoreList = (props) => {
         className=" float-right mr-1"
         startIcon={<DownloadIcon />}
         onClick={syncDownload}
-        style={{ backgroundColor: '#014d88', fontWeight: "bolder" }}
+        style={{ backgroundColor: "#014d88", fontWeight: "bolder" }}
       >
         <span style={{ textTransform: "capitalize" }}>Download </span>
       </Button>
@@ -135,13 +137,16 @@ const RestoreList = (props) => {
           { title: "Date of Upload ", field: "date", filtering: false },
           { title: "Status", field: "status", filtering: false },
         ]}
-        data={syncList.map((row) => ({
-          name: row.filename,
-          url: row.tableName,
-          uploadSize: row.fileSize,
-          date: row.dateCreated.replace("T", " "),
-          status: <Badge color="info">{row.status}</Badge>,
-        }))}
+        data={
+          Array.isArray(syncList) &&
+          syncList?.map(row => ({
+            name: row.filename,
+            url: row.tableName,
+            uploadSize: row.fileSize,
+            date: row.dateCreated.replace("T", " "),
+            status: <Badge color="info">{row.status}</Badge>,
+          }))
+        }
         options={{
           headerStyle: {
             backgroundColor: "#014d88",
@@ -159,7 +164,11 @@ const RestoreList = (props) => {
           debounceInterval: 400,
         }}
       />
-      <RestoreModal modalstatus={modal} togglestatus={toggle} setSyncList={setSyncList} />
+      <RestoreModal
+        modalstatus={modal}
+        togglestatus={toggle}
+        setSyncList={setSyncList}
+      />
       <DownloadModal
         modalstatus={modalDownload}
         togglestatus={toggleDownload}

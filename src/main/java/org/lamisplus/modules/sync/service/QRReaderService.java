@@ -9,9 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
-import org.lamisplus.modules.hts.service.HtsClientService;
-import org.lamisplus.modules.hts.service.IndexElicitationService;
-import org.lamisplus.modules.hts.service.RiskStratificationService;
+import org.lamisplus.modules.hts.service.*;
 import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
 
@@ -31,6 +29,8 @@ import scala.Int;
 import java.io.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
@@ -46,6 +46,9 @@ public class QRReaderService {
     private final HtsClientService htsClientService;
     private final RiskStratificationService riskStratificationService;
     private final IndexElicitationService indexElicitationService;
+    private final FamilyIndexTestingService familyIndexTestingService;
+    private final ClientReferralService clientReferralService;
+    private final PNSService pnsService;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
 
@@ -80,12 +83,12 @@ public class QRReaderService {
         // check if the filename exist in quickSyn history
         Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
         if(fileExists){
-           throw new IllegalArgumentException("File with the name " + fileName + " has already been processed");
+            throw new IllegalArgumentException("File with the name " + fileName + " has already been processed");
         }
 
         byte[] fileBytes = multipartFile.getBytes();
 
-        // Convert the byte array to a ZipInputStream
+        // Convert the byte array to a ZipInputStream3
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(fileBytes);
              ZipInputStream zipInputStream = new ZipInputStream(byteArrayInputStream)) {
             ZipEntry entry;
@@ -115,6 +118,9 @@ public class QRReaderService {
                     Object postTestField = result.get("postTest");
                     Object recencyField = result.get("recency");
                     Object elicitationField = result.get("elicitation");
+                    Object familyIndexTestingField = result.get("familyIndexTesting");
+                    Object htsClientReferralField = result.get("htsClientReferral");
+                    Object partnerNotificationServicesField = result.get("partnerNotificationServices");
 
                     // Safely cast fields to their expected types
                     Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
@@ -124,6 +130,9 @@ public class QRReaderService {
                     Map<String, Object> postTestData = (Map<String, Object>) postTestField;
                     Map<String, Object> recencyData = (Map<String, Object>) recencyField;
                     Map<String, Object> elicitationData = (Map<String, Object>) elicitationField;
+                    Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
+                    Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
+                    Map<String, Object> partnerNotificationServicesData = (Map<String, Object>) partnerNotificationServicesField;
 
                     if (personField instanceof Map) {
                         // Process single person data
@@ -139,7 +148,7 @@ public class QRReaderService {
                             riskStratificationDto.setPersonId(patientId);
                             System.out.println("riskStratificationDto : "+ riskStratificationDto);
                             RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-                             // Sync HtsClient if RiskStratificationResponseDto is not null
+                            // Sync HtsClient if RiskStratificationResponseDto is not null
                             if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
                                 HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
                                 htsClientRequestDto.setPersonId(patientId);
@@ -170,6 +179,18 @@ public class QRReaderService {
                                 if (htsClientDto != null && elicitationField != null) {
                                     IndexElicitationDto indexElicitationDto = createIndexElicitation(elicitationData, htsClientDto.getId());
                                     indexElicitationService.save(indexElicitationDto);
+                                }
+                                if (htsClientDto != null && familyIndexTestingField != null) {
+                                    FamilyIndexTestingRequestDTO familyIndexTestingRequestDTO = createFamilyIndexTesting(familyIndexTestingData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
+                                    familyIndexTestingService.save(familyIndexTestingRequestDTO);
+                                }
+                                if (htsClientDto != null && htsClientReferralField != null) {
+                                    HtsClientReferralRequestDTO htsClientReferralRequestDTO  = createHtsClientReferral(htsClientReferralData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
+                                    clientReferralService.registerClientReferralForm(htsClientReferralRequestDTO);
+                                }
+                                if (htsClientDto != null && partnerNotificationServicesField != null) {
+                                    PersonalNotificationServiceRequestDTO personalNotificationServiceRequestDTO  = createPartnerNotificationServices(partnerNotificationServicesData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
+                                    pnsService.save(personalNotificationServiceRequestDTO);
                                 }
                             }
                         }
@@ -524,6 +545,170 @@ public class QRReaderService {
                 .source("Mobile")
                 .uuid(uuid)
                 .build();
+    }
+    private FamilyIndexTestingRequestDTO createFamilyIndexTesting(Map<String, Object> familyIndexTestingData, String htsClientUuid, Long htsClientId) {
+        String address = (String) familyIndexTestingData.get("address");
+        Integer age = convertToInteger(familyIndexTestingData.get("age"));
+        String alternatePhoneNumber = (String) familyIndexTestingData.get("alternatePhoneNumber");
+        String contactId = (String) familyIndexTestingData.get("contactId");
+        LocalDate dateClientEnrolledOnTreatment = parseDate(familyIndexTestingData.get("dateClientEnrolledOnTreatment"));
+        LocalDate dateIndexClientConfirmedHivPositiveTestResult = parseDate(familyIndexTestingData.get("dateIndexClientConfirmedHivPositiveTestResult"));
+        LocalDate dateOfBirth = parseDate(familyIndexTestingData.get("dateOfBirth"));
+        String facilityName = (String) familyIndexTestingData.get("facilityName");
+        String familyIndexClient = (String) familyIndexTestingData.get("familyIndexClient");
+        String indexClientId = (String) familyIndexTestingData.get("indexClientId");
+        String isClientCurrentlyOnHivTreatment =  (String) familyIndexTestingData.get("isClientCurrentlyOnHivTreatment");
+        Double latitude = convertToDouble(familyIndexTestingData.get("latitude"));
+        Double longitude = convertToDouble(familyIndexTestingData.get("longitude"));
+        String lga = (String) familyIndexTestingData.get("lga");
+        Long maritalStatus = convertToLong(familyIndexTestingData.get("maritalStatus"));
+        String name = (String) familyIndexTestingData.get("name");
+        String phoneNumber = (String) familyIndexTestingData.get("phoneNumber");
+        String recencyTesting = (String) familyIndexTestingData.get("recencyTesting");
+        String setting = (String) familyIndexTestingData.get("setting");
+        Long sex = convertToLong(familyIndexTestingData.get("sex"));
+        Long state = convertToLong(familyIndexTestingData.get("state"));
+        Object extra = familyIndexTestingData.get("extra");
+        String virallyUnSuppressed = (String)  familyIndexTestingData.get("virallyUnSuppressed");
+        LocalDate visitDate = parseDate(familyIndexTestingData.get("visitDate"));
+        String willingToHaveChildrenTestedElseWhere = (String) familyIndexTestingData.get("willingToHaveChildrenTestedElseWhere");
+//        String source = (String) familyIndexTestingData.get("source");
+
+        // You can expand this to map nested DTOs as needed
+
+        return FamilyIndexTestingRequestDTO.builder()
+                .htsClientId(htsClientId)
+                .extra(extra)
+                .htsClientUuid(htsClientUuid)
+                .age(String.valueOf(age))
+                .alternatePhoneNumber(alternatePhoneNumber)
+//                .contactId(contactId)
+                .dateClientEnrolledOnTreatment(String.valueOf(dateClientEnrolledOnTreatment))
+                .dateIndexClientConfirmedHivPositiveTestResult(dateIndexClientConfirmedHivPositiveTestResult)
+                .dateOfBirth(dateOfBirth)
+                .facilityName(facilityName)
+                .familyIndexClient(familyIndexClient)
+                .indexClientId(indexClientId)
+                .isClientCurrentlyOnHivTreatment(String.valueOf(isClientCurrentlyOnHivTreatment))
+//                .latitude(latitude)
+//                .longitude(longitude)
+                .lga(lga)
+                .maritalStatus(String.valueOf(maritalStatus))
+                .name(name)
+                .phoneNumber(phoneNumber)
+                .recencyTesting(recencyTesting)
+                .setting(setting)
+                .sex(String.valueOf(sex))
+                .state(String.valueOf(state))
+                .virallyUnSuppressed(String.valueOf(virallyUnSuppressed))
+                .visitDate(visitDate)
+                .willingToHaveChildrenTestedElseWhere(String.valueOf(willingToHaveChildrenTestedElseWhere))
+//                .source(source)
+                .build();
+    }
+    private HtsClientReferralRequestDTO createHtsClientReferral(Map<String, Object> referralData, String htsClientUuid, Long htsClientId) {
+        String addressOfReceivingFacility = (String) referralData.get("addressOfReceivingFacility");
+        String addressOfReferringFacility = (String) referralData.get("addressOfReferringFacility");
+        String comments = (String) referralData.get("comments");
+        LocalDate dateVisit = parseDate(referralData.get("dateVisit"));
+        String middleName = (String) referralData.get("middleName");
+        String nameOfContactPerson = (String) referralData.get("nameOfContactPerson");
+        String nameOfPersonReferringClient = (String) referralData.get("nameOfPersonReferringClient");
+        String nameOfReceivingFacility = (String) referralData.get("nameOfReceivingFacility");
+        String nameOfReferringFacility = (String) referralData.get("nameOfReferringFacility");
+        String phoneNoOfReceivingFacility = (String) referralData.get("phoneNoOfReceivingFacility");
+        String phoneNoOfReferringFacility = (String) referralData.get("phoneNoOfReferringFacility");
+        String receivingFacilityLgaName = (String) referralData.get("receivingFacilityLgaName");
+        String receivingFacilityStateName = (String) referralData.get("receivingFacilityStateName");
+        String referredFromFacility = (String) referralData.get("referredFromFacility");
+        String referredTo = (String) referralData.get("referredTo");
+        Map<String, Object> serviceNeeded = (Map<String, Object>) referralData.get("serviceNeeded");
+
+        HtsClientReferralRequestDTO dto = new HtsClientReferralRequestDTO();
+        dto.setHtsClientUuid(htsClientUuid);
+        dto.setHtsClientId(htsClientId);
+        dto.setAddressOfReceivingFacility(addressOfReceivingFacility);
+        dto.setAddressOfReferringFacility(addressOfReferringFacility);
+        dto.setComments(comments);
+        dto.setDateVisit(dateVisit);
+        dto.setNameOfContactPerson(nameOfContactPerson);
+        dto.setNameOfPersonReferringClient(nameOfPersonReferringClient);
+        dto.setNameOfReceivingFacility(nameOfReceivingFacility);
+        dto.setNameOfReferringFacility(nameOfReferringFacility);
+        dto.setPhoneNoOfReceivingFacility(phoneNoOfReceivingFacility);
+        dto.setPhoneNoOfReferringFacility(phoneNoOfReferringFacility);
+        dto.setReceivingFacilityLgaName(receivingFacilityLgaName);
+        dto.setReceivingFacilityStateName(receivingFacilityStateName);
+        dto.setReferredFromFacility(referredFromFacility);
+        dto.setReferredTo(referredTo);
+        dto.setServiceNeeded(serviceNeeded);
+        return dto;
+    }
+    private PersonalNotificationServiceRequestDTO createPartnerNotificationServices(Map<String, Object> pnsData,String htsClientUuid, Long htsClientId) {
+        PersonalNotificationServiceRequestDTO dto = new PersonalNotificationServiceRequestDTO();
+        Map<String, Object> htsClientInfo = (Map<String, Object>) pnsData.get("htsClientInformation");
+        Map<String, Object> contactTracing = (Map<String, Object>) pnsData.get("contactTracing");
+        Map<String, Object> violence = (Map<String, Object>) pnsData.get("intermediatePartnerViolence");
+
+        dto.setHtsClientId(htsClientId);
+        dto.setAcceptedHts(String.valueOf(pnsData.get("acceptedHts")));
+        dto.setAcceptedPns((String) pnsData.get("acceptedPns"));
+        dto.setAddress((String) pnsData.get("address"));
+        dto.setAlternatePhoneNumber((String) pnsData.get("alternatePhoneNumber"));
+        dto.setDateEnrollmentOnART(parseDate(pnsData.get("dateEnrollmentOnART")));
+        dto.setDateOfElicitation(parseDate(pnsData.get("dateOfElicitation")));
+        dto.setDatePartnerTested(parseDate(pnsData.get("datePartnerTested")));
+        dto.setDob(parseDate(pnsData.get("dob")));
+        dto.setFirstName((String) pnsData.get("firstName"));
+        dto.setHivTestResult((String) pnsData.get("hivTestResult"));
+        dto.setIndexClientId((String) pnsData.get("indexClientId"));
+        dto.setKnownHivPositive((String) pnsData.get("knownHivPositive"));
+        dto.setLastName((String) pnsData.get("lastName"));
+        dto.setMiddleName((String) pnsData.get("middleName"));
+        dto.setNotificationMethod(String.valueOf(pnsData.get("notificationMethod")));
+        dto.setOfferedPns((String) pnsData.get("offeredPns"));
+        dto.setPartnerId((String) pnsData.get("partnerId"));
+        dto.setPhoneNumber((String) pnsData.get("phoneNumber"));
+        dto.setReasonForDecline((String) pnsData.get("reasonForDecline"));
+        dto.setRelationshipToIndexClient((String) pnsData.get("relationshipToIndexClient"));
+        dto.setSex(String.valueOf( pnsData.get("sex")));
+        dto.setContactTracing(contactTracing);
+        dto.setHtsClientInformation(htsClientInfo);
+        dto.setIntermediatePartnerViolence(violence);
+        return dto;
+    }
+
+    private LocalDate parseDate(Object dateObj) {
+        if (dateObj == null) {
+            return null;
+        }
+        String dateStr = dateObj.toString().trim();
+        if (dateStr.isEmpty()) {
+            return null;
+        }
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+            return LocalDate.parse(dateStr, formatter);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+
+    private Integer convertToInteger(Object obj) {
+        try {
+            return obj != null ? Integer.parseInt(obj.toString()) : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Double convertToDouble(Object obj) {
+        try {
+            return obj != null ? Double.parseDouble(obj.toString()) : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
 
