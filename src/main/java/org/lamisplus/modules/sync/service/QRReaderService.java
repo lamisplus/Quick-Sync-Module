@@ -671,7 +671,7 @@ public class QRReaderService {
         dto.setPhoneNumber((String) pnsData.get("phoneNumber"));
         dto.setReasonForDecline((String) pnsData.get("reasonForDecline"));
         dto.setRelationshipToIndexClient((String) pnsData.get("relationshipToIndexClient"));
-        dto.setSex(String.valueOf(pnsData.get("sex")));
+        dto.setSex(String.valueOf( pnsData.get("sex")));
         dto.setContactTracing(contactTracing);
         dto.setHtsClientInformation(htsClientInfo);
         dto.setIntermediatePartnerViolence(violence);
