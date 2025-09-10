@@ -565,6 +565,7 @@ public class QRReaderService {
         String name = (String) familyIndexTestingData.get("name");
         String phoneNumber = (String) familyIndexTestingData.get("phoneNumber");
         String recencyTesting = (String) familyIndexTestingData.get("recencyTesting");
+        Object familyIndexRequestDto = familyIndexTestingData.get("familyIndexRequestDto");
         String setting = (String) familyIndexTestingData.get("setting");
         Long sex = convertToLong(familyIndexTestingData.get("sex"));
         Long state = convertToLong(familyIndexTestingData.get("state"));
@@ -597,6 +598,7 @@ public class QRReaderService {
                 .name(name)
                 .phoneNumber(phoneNumber)
                 .recencyTesting(recencyTesting)
+                .familyIndexRequestDto((FamilyIndexRequestDto) familyIndexRequestDto)
                 .setting(setting)
                 .sex(String.valueOf(sex))
                 .state(String.valueOf(state))
