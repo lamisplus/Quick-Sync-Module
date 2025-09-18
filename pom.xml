@@ -92,6 +92,11 @@
             <artifactId>hts</artifactId>
             <version>2.2.2.1</version>
         </dependency>
+        <dependency>
+            <groupId>org.lamisplus.modules</groupId>
+            <artifactId>pmtct</artifactId>
+            <version>2.3.1.2</version>
+        </dependency>
 
         <dependency>
             <groupId>org.lamisplus.modules</groupId>

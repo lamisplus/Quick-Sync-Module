@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
-import org.apache.kafka.common.errors.IllegalSaslStateException;
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
@@ -13,18 +12,15 @@ import org.lamisplus.modules.hts.service.*;
 import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
 
+import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.patient.service.PersonService;
+import org.lamisplus.modules.pmtct.domain.dto.*;
+import org.lamisplus.modules.pmtct.service.*;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.repository.QuickSyncHistoryRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
-import scala.Int;
 
 import java.io.*;
 import java.time.LocalDate;
@@ -49,6 +45,12 @@ public class QRReaderService {
     private final FamilyIndexTestingService familyIndexTestingService;
     private final ClientReferralService clientReferralService;
     private final PNSService pnsService;
+    private final ANCService ancService;
+    private final DeliveryService deliveryService;
+    private final PMTCTEnrollmentService pmtctService;
+    private final InfantVisitService infantVisitService;
+    private final PmtctVisitService pmtctVisitService;
+    private final PersonRepository personRepository;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
 
@@ -121,6 +123,13 @@ public class QRReaderService {
                     Object familyIndexTestingField = result.get("familyIndexTesting");
                     Object htsClientReferralField = result.get("htsClientReferral");
                     Object partnerNotificationServicesField = result.get("partnerNotificationServices");
+                    Object ancField = result.get("anc");
+                    Object childFollowupVisitField = result.get("childFollowupVisit");
+                    Object infantRegistrationField = result.get("infantRegistration");
+                    Object labourDeliveryField = result.get("labourDelivery");
+                    Object motherFollowupVisitField = result.get("motherFollowupVisit");
+                    Object partnerRegistrationField = result.get("partnerRegistration");
+                    Object pmtctEnrollmentField = result.get("pmtctEnrollment");
 
                     // Safely cast fields to their expected types
                     Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
@@ -133,6 +142,13 @@ public class QRReaderService {
                     Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
                     Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
                     Map<String, Object> partnerNotificationServicesData = (Map<String, Object>) partnerNotificationServicesField;
+                    Map<String, Object> ancData = (Map<String, Object>) ancField;
+                    Map<String, Object> childFollowupVisitData = (Map<String, Object>) childFollowupVisitField;
+                    Map<String, Object> infantRegistrationData = (Map<String, Object>) infantRegistrationField;
+                    Map<String, Object> labourDeliveryData = (Map<String, Object>) labourDeliveryField;
+                    Map<String, Object> motherFollowupVisitData = (Map<String, Object>) motherFollowupVisitField;
+                    Map<String, Object> partnerRegistrationData = (Map<String, Object>) partnerRegistrationField;
+                    Map<String, Object> pmtctEnrollmentData = (Map<String, Object>) pmtctEnrollmentField;
 
                     if (personField instanceof Map) {
                         // Process single person data
@@ -142,6 +158,7 @@ public class QRReaderService {
 
                         if (personResponseDto != null) {
                             Long patientId = personResponseDto.getId();
+                            String patientUuid = String.valueOf(personResponseDto.getUuid());
                             System.out.println(" PersonResponseDto : "+ patientId);
                             // Create and save the RiskStratificationDto
                             RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
@@ -156,41 +173,102 @@ public class QRReaderService {
 
                                 HtsClientDto htsClientDto = htsClientService.save(htsClientRequestDto);
 
-                                if (htsClientDto != null && preTestField != null) {
-                                    HtsPreTestCounselingDto htsPreTestCounselingDto = createPreTestCounseling(preTestData, htsClientDto.getId(), patientId);
-                                    htsClientService.updatePreTestCounseling(htsClientDto.getId(), htsPreTestCounselingDto);
-                                }
+                                if (htsClientDto != null) {
+                                    Long clientId = htsClientDto.getId();
+                                    String clientUuid = htsClientDto.getHtsClientUUid();
+                                    Map<Object, Runnable> fieldActions = new HashMap<>();
+                                    if (preTestField != null) {
+                                        fieldActions.put(preTestField, () -> {
+                                            HtsPreTestCounselingDto dto = createPreTestCounseling(preTestData, clientId, patientId);
+                                            htsClientService.updatePreTestCounseling(clientId, dto);
+                                        });
+                                    }
+                                    if (requestResultField != null) {
+                                        fieldActions.put(requestResultField, () -> {
+                                            HtsRequestResultDto dto = createRequestResult(requestResultData, clientId, patientId);
+                                            htsClientService.updateRequestResult(clientId, dto);
+                                        });
+                                    }
+                                    if (postTestField != null) {
+                                        fieldActions.put(postTestField, () -> {
+                                            PostTestCounselingDto dto = createPostTestCounseling(postTestData, clientId, patientId);
+                                            htsClientService.updatePostTestCounselingKnowledgeAssessment(clientId, dto);
+                                        });
+                                    }
 
-                                if (htsClientDto != null && requestResultField != null) {
-                                    HtsRequestResultDto htsRequestResultDto = createRequestResult(requestResultData, htsClientDto.getId(), patientId);
-                                    htsClientService.updateRequestResult(htsClientDto.getId(), htsRequestResultDto);
-                                }
+                                    if (recencyField != null) {
+                                        fieldActions.put(recencyField, () -> {
+                                            HtsRecencyDto dto = createRecency(recencyData, clientId, patientId);
+                                            htsClientService.updateRecency(clientId, dto);
+                                        });
+                                    }
+                                    if (elicitationField != null) {
+                                        fieldActions.put(elicitationField, () -> {
+                                            IndexElicitationDto dto = createIndexElicitation(elicitationData, clientId);
+                                            indexElicitationService.save(dto);
+                                        });
+                                    }
 
-                                if (htsClientDto != null && postTestField != null) {
-                                    PostTestCounselingDto postTestCounselingDto = createPostTestCounseling(postTestData, htsClientDto.getId(), patientId);
-                                    htsClientService.updatePostTestCounselingKnowledgeAssessment(htsClientDto.getId(), postTestCounselingDto);
-                                }
-
-                                if (htsClientDto != null && recencyField != null) {
-                                    HtsRecencyDto recencyDto = createRecency(recencyData, htsClientDto.getId(), patientId);
-                                    htsClientService.updateRecency(htsClientDto.getId(), recencyDto);
-                                }
-
-                                if (htsClientDto != null && elicitationField != null) {
-                                    IndexElicitationDto indexElicitationDto = createIndexElicitation(elicitationData, htsClientDto.getId());
-                                    indexElicitationService.save(indexElicitationDto);
-                                }
-                                if (htsClientDto != null && familyIndexTestingField != null) {
-                                    FamilyIndexTestingRequestDTO familyIndexTestingRequestDTO = createFamilyIndexTesting(familyIndexTestingData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
-                                    familyIndexTestingService.save(familyIndexTestingRequestDTO);
-                                }
-                                if (htsClientDto != null && htsClientReferralField != null) {
-                                    HtsClientReferralRequestDTO htsClientReferralRequestDTO  = createHtsClientReferral(htsClientReferralData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
-                                    clientReferralService.registerClientReferralForm(htsClientReferralRequestDTO);
-                                }
-                                if (htsClientDto != null && partnerNotificationServicesField != null) {
-                                    PersonalNotificationServiceRequestDTO personalNotificationServiceRequestDTO  = createPartnerNotificationServices(partnerNotificationServicesData, htsClientDto.getHtsClientUUid(), htsClientDto.getId());
-                                    pnsService.save(personalNotificationServiceRequestDTO);
+                                    if (familyIndexTestingField != null) {
+                                        fieldActions.put(familyIndexTestingField, () -> {
+                                            FamilyIndexTestingRequestDTO dto = createFamilyIndexTesting(familyIndexTestingData, clientUuid, clientId);
+                                            familyIndexTestingService.save(dto);
+                                        });
+                                    }
+                                    if (htsClientReferralField != null) {
+                                        fieldActions.put(htsClientReferralField, () -> {
+                                            HtsClientReferralRequestDTO dto = createHtsClientReferral(htsClientReferralData, clientUuid, clientId);
+                                            clientReferralService.registerClientReferralForm(dto);
+                                        });
+                                    }
+                                    if (partnerNotificationServicesField != null) {
+                                        fieldActions.put(partnerNotificationServicesField, () -> {
+                                            PersonalNotificationServiceRequestDTO dto = createPartnerNotificationServices(partnerNotificationServicesData, clientUuid, clientId);
+                                            pnsService.save(dto);
+                                        });
+                                    }
+                                    if (ancField != null) {
+                                        fieldActions.put(ancField, () -> {
+                                            ANCRequestDto dto = createAnc(ancData, String.valueOf(clientId),patientId,personDto);
+                                            ancService.save(dto);
+                                        });
+                                    }
+//                                    if (childFollowupVisitField != null) {
+//                                        fieldActions.put(childFollowupVisitField, () -> {
+//                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
+//                                            infantVisitService.saveConsolidation(dto,dto.getInfantRapidAntiBodyTestDto());
+//                                        });
+//                                    }
+//                                    if (labourDeliveryField != null) {
+//                                        fieldActions.put(labourDeliveryField, () -> {
+//                                            DeliveryRequestDto dto = createDeliveryRequestDto(labourDeliveryData);
+//                                            deliveryService.save(dto);
+//                                        });
+//                                    }
+//                                    if (motherFollowupVisitField != null) {
+//                                        fieldActions.put(motherFollowupVisitField, () -> {
+//                                            pmtctVisitService.save((PmtctVisitRequestDto) motherFollowupVisitData);
+//                                        });
+//                                    }
+//                                    if (partnerRegistrationField != null) {
+//                                        fieldActions.put(partnerRegistrationField, () -> {
+//                                            PartnerInformation dto = createPartnerInformation(partnerRegistrationData);
+//                                            ancService.updateAncWithPartnerInfo(clientId,dto);
+//                                        });
+//                                    }
+                                    if (pmtctEnrollmentField != null) {
+                                        fieldActions.put(pmtctEnrollmentField, () -> {
+                                            PMTCTEnrollmentRequestDto dto = createPmtctEnrollmentDto(pmtctEnrollmentData,personDto,patientUuid);
+                                            System.out.println("DTO to save pmtct enrolmnt: "+dto);
+                                            pmtctService.save(dto);
+                                        });
+                                    }
+                                    // Execute all actions
+                                    fieldActions.forEach((field, action) -> {
+                                        if (field != null) {
+                                            action.run();
+                                        }
+                                    });
                                 }
                             }
                         }
@@ -547,65 +625,45 @@ public class QRReaderService {
                 .build();
     }
     private FamilyIndexTestingRequestDTO createFamilyIndexTesting(Map<String, Object> familyIndexTestingData, String htsClientUuid, Long htsClientId) {
-        String address = (String) familyIndexTestingData.get("address");
-        Integer age = convertToInteger(familyIndexTestingData.get("age"));
-        String alternatePhoneNumber = (String) familyIndexTestingData.get("alternatePhoneNumber");
-        String contactId = (String) familyIndexTestingData.get("contactId");
-        LocalDate dateClientEnrolledOnTreatment = parseDate(familyIndexTestingData.get("dateClientEnrolledOnTreatment"));
-        LocalDate dateIndexClientConfirmedHivPositiveTestResult = parseDate(familyIndexTestingData.get("dateIndexClientConfirmedHivPositiveTestResult"));
-        LocalDate dateOfBirth = parseDate(familyIndexTestingData.get("dateOfBirth"));
-        String facilityName = (String) familyIndexTestingData.get("facilityName");
-        String familyIndexClient = (String) familyIndexTestingData.get("familyIndexClient");
-        String indexClientId = (String) familyIndexTestingData.get("indexClientId");
-        String isClientCurrentlyOnHivTreatment =  (String) familyIndexTestingData.get("isClientCurrentlyOnHivTreatment");
-        Double latitude = convertToDouble(familyIndexTestingData.get("latitude"));
-        Double longitude = convertToDouble(familyIndexTestingData.get("longitude"));
-        String lga = (String) familyIndexTestingData.get("lga");
-        Long maritalStatus = convertToLong(familyIndexTestingData.get("maritalStatus"));
-        String name = (String) familyIndexTestingData.get("name");
-        String phoneNumber = (String) familyIndexTestingData.get("phoneNumber");
-        String recencyTesting = (String) familyIndexTestingData.get("recencyTesting");
-        Object familyIndexRequestDto = familyIndexTestingData.get("familyIndexRequestDto");
-        String setting = (String) familyIndexTestingData.get("setting");
-        Long sex = convertToLong(familyIndexTestingData.get("sex"));
-        Long state = convertToLong(familyIndexTestingData.get("state"));
-        Object extra = familyIndexTestingData.get("extra");
-        String virallyUnSuppressed = (String)  familyIndexTestingData.get("virallyUnSuppressed");
-        LocalDate visitDate = parseDate(familyIndexTestingData.get("visitDate"));
-        String willingToHaveChildrenTestedElseWhere = (String) familyIndexTestingData.get("willingToHaveChildrenTestedElseWhere");
-//        String source = (String) familyIndexTestingData.get("source");
+        FamilyIndexRequestDto familyIndexRequestDto = objectMapper.convertValue(
+                familyIndexTestingData.get("familyIndexRequestDto"),
+                FamilyIndexRequestDto.class
+        );
 
-        // You can expand this to map nested DTOs as needed
+        // 🛡️ Sanitize FamilyTestingTrackerRequestDTOs — remove entries with null facilityId
+        if (familyIndexRequestDto.getFamilyTestingTrackerRequestDTOs() != null) {
+            familyIndexRequestDto.setFamilyTestingTrackerRequestDTOs(
+                    familyIndexRequestDto.getFamilyTestingTrackerRequestDTOs().stream()
+                            .filter(tracker -> tracker.getFacilityId() != null)
+                            .collect(Collectors.toList())
+            );
+        }
 
         return FamilyIndexTestingRequestDTO.builder()
                 .htsClientId(htsClientId)
-                .extra(extra)
                 .htsClientUuid(htsClientUuid)
-                .age(String.valueOf(age))
-                .alternatePhoneNumber(alternatePhoneNumber)
-//                .contactId(contactId)
-                .dateClientEnrolledOnTreatment(String.valueOf(dateClientEnrolledOnTreatment))
-                .dateIndexClientConfirmedHivPositiveTestResult(dateIndexClientConfirmedHivPositiveTestResult)
-                .dateOfBirth(dateOfBirth)
-                .facilityName(facilityName)
-                .familyIndexClient(familyIndexClient)
-                .indexClientId(indexClientId)
-                .isClientCurrentlyOnHivTreatment(String.valueOf(isClientCurrentlyOnHivTreatment))
-//                .latitude(latitude)
-//                .longitude(longitude)
-                .lga(lga)
-                .maritalStatus(String.valueOf(maritalStatus))
-                .name(name)
-                .phoneNumber(phoneNumber)
-                .recencyTesting(recencyTesting)
-                .familyIndexRequestDto((FamilyIndexRequestDto) familyIndexRequestDto)
-                .setting(setting)
-                .sex(String.valueOf(sex))
-                .state(String.valueOf(state))
-                .virallyUnSuppressed(String.valueOf(virallyUnSuppressed))
-                .visitDate(visitDate)
-                .willingToHaveChildrenTestedElseWhere(String.valueOf(willingToHaveChildrenTestedElseWhere))
-//                .source(source)
+                .extra(familyIndexTestingData.get("extra"))
+                .age(String.valueOf(convertToInteger(familyIndexTestingData.get("age"))))
+                .alternatePhoneNumber((String) familyIndexTestingData.get("alternatePhoneNumber"))
+                .dateClientEnrolledOnTreatment(String.valueOf(parseDate(familyIndexTestingData.get("dateClientEnrolledOnTreatment"))))
+                .dateIndexClientConfirmedHivPositiveTestResult(parseDate(familyIndexTestingData.get("dateIndexClientConfirmedHivPositiveTestResult")))
+                .dateOfBirth(parseDate(familyIndexTestingData.get("dateOfBirth")))
+                .facilityName((String) familyIndexTestingData.get("facilityName"))
+                .familyIndexClient((String) familyIndexTestingData.get("familyIndexClient"))
+                .indexClientId((String) familyIndexTestingData.get("indexClientId"))
+                .isClientCurrentlyOnHivTreatment(String.valueOf(familyIndexTestingData.get("isClientCurrentlyOnHivTreatment")))
+                .lga((String) familyIndexTestingData.get("lga"))
+                .maritalStatus(String.valueOf(convertToLong(familyIndexTestingData.get("maritalStatus"))))
+                .name((String) familyIndexTestingData.get("name"))
+                .phoneNumber((String) familyIndexTestingData.get("phoneNumber"))
+                .recencyTesting((String) familyIndexTestingData.get("recencyTesting"))
+                .familyIndexRequestDto(familyIndexRequestDto) // now sanitized
+                .setting((String) familyIndexTestingData.get("setting"))
+                .sex(String.valueOf(convertToLong(familyIndexTestingData.get("sex"))))
+                .state(String.valueOf(convertToLong(familyIndexTestingData.get("state"))))
+                .virallyUnSuppressed(String.valueOf(familyIndexTestingData.get("virallyUnSuppressed")))
+                .visitDate(parseDate(familyIndexTestingData.get("visitDate")))
+                .willingToHaveChildrenTestedElseWhere(String.valueOf(familyIndexTestingData.get("willingToHaveChildrenTestedElseWhere")))
                 .build();
     }
     private HtsClientReferralRequestDTO createHtsClientReferral(Map<String, Object> referralData, String htsClientUuid, Long htsClientId) {
@@ -647,6 +705,7 @@ public class QRReaderService {
         return dto;
     }
     private PersonalNotificationServiceRequestDTO createPartnerNotificationServices(Map<String, Object> pnsData,String htsClientUuid, Long htsClientId) {
+        System.out.println("params: "+pnsData+" "+htsClientUuid+" "+htsClientId);
         PersonalNotificationServiceRequestDTO dto = new PersonalNotificationServiceRequestDTO();
         Map<String, Object> htsClientInfo = (Map<String, Object>) pnsData.get("htsClientInformation");
         Map<String, Object> contactTracing = (Map<String, Object>) pnsData.get("contactTracing");
@@ -678,6 +737,260 @@ public class QRReaderService {
         dto.setHtsClientInformation(htsClientInfo);
         dto.setIntermediatePartnerViolence(violence);
         return dto;
+    }
+
+    private PMTCTEnrollmentRequestDto createPmtctEnrollmentDto(Map<String, Object> pmtctData, PersonDto personDto, String patientUuid) {
+        System.out.println("personDtossss: " + pmtctData + personDto + patientUuid);
+        Optional<Person> person =  personRepository.findByUuid(patientUuid);
+        System.out.println("person::: "+person);
+
+        Long id = null;
+        Object idObj = pmtctData.get("id");
+        if (idObj instanceof String) {
+            String idStr = (String) idObj;
+            if (idStr != null && !idStr.trim().isEmpty()) {
+                try {
+                    id = Long.valueOf(idStr);
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid ID format: {}"+idStr);
+                }
+            }
+        } else if (idObj instanceof Number) {
+            id = ((Number) idObj).longValue();
+        }
+
+        Long regimenTypeId = null;
+        Object regimenTypeIdObj = pmtctData.get("regimenTypeId");
+        if (regimenTypeIdObj instanceof String) {
+            String regimenStr = (String) regimenTypeIdObj;
+            if (!regimenStr.trim().isEmpty()) {
+                try {
+                    regimenTypeId = Long.valueOf(regimenStr);
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid regimenTypeId format: {}"+ regimenStr);
+                }
+            }
+        } else if (regimenTypeIdObj instanceof Number) {
+            regimenTypeId = ((Number) regimenTypeIdObj).longValue();
+        }
+
+        // Ensure personUuid is present
+        String personUuid = patientUuid;
+
+        if (personUuid == null || personUuid.trim().isEmpty()) {
+            throw new RuntimeException("Unable to resolve personUuid from input data.");
+        }
+
+        return PMTCTEnrollmentRequestDto.builder()
+                .id(id)
+                .ancNo((String) pmtctData.get("ancNo"))
+                .pmtctEnrollmentDate(parseDate(pmtctData.get("pmtctEnrollmentDate")))
+                .gravida(convertToInteger(pmtctData.get("gravida")))
+                .gAWeeks(convertToInteger(pmtctData.get("gAWeeks")))
+                .entryPoint((String) pmtctData.get("entryPoint"))
+                .artStartDate(parseDate(pmtctData.get("artStartDate")))
+                .artStartTime((String) pmtctData.get("artStartTime"))
+                .tbStatus((String) pmtctData.get("tbStatus"))
+                .personDto(personDto)
+                .pmtctType((String) pmtctData.get("pmtctType"))
+                .personUuid(patientUuid)
+                .hivStatus((String) pmtctData.get("hivStatus"))
+                .lmp(parseDate(pmtctData.get("lmp")))
+                .motherArtInitiationTime((String) pmtctData.get("motherArtInitiationTime"))
+                .regimenTypeId(regimenTypeId)
+                .regimenId((String) pmtctData.get("regimenId"))
+                .hepatitisB((String) pmtctData.get("hepatitisB"))
+                .urinalysis((String) pmtctData.get("urinalysis"))
+                .timeOfHivDiagnosis((String) pmtctData.get("timeOfHivDiagnosis"))
+                .dateOfDelivery((String) pmtctData.get("dateOfDelivery"))
+                .expectedDeliveryDate((String) pmtctData.get("expectedDeliveryDate"))
+                .build();
+    }
+
+
+    private <T> T convertAncToDto(Object value, Class<T> clazz) {
+        if (value == null) {
+            return null;
+        }
+        if (clazz.isInstance(value)) {
+            return clazz.cast(value);
+        }
+        if (value instanceof Map) {
+            try {
+                return objectMapper.convertValue(value, clazz);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Failed to convert " + value + " to " + clazz.getSimpleName(), e);
+            }
+        }
+        throw new IllegalArgumentException("Expected instance of " + clazz.getSimpleName() +
+                " or Map, but got: " + (value != null ? value.getClass().getName() : "null"));
+    }
+
+    private ANCRequestDto createAnc(Map<String, Object> ancData, String personUuid,Long patientId,PersonDto personDto) {
+        if (ancData == null) {
+            throw new IllegalArgumentException("ancData cannot be null");
+        }
+        if (personUuid == null || personUuid.trim().isEmpty()) {
+            throw new IllegalArgumentException("personUuid is required");
+        }
+
+        ANCRequestDto dto = new ANCRequestDto();
+
+        // --- Set person_uuid FIRST ---
+        dto.setPerson_uuid(personUuid);
+
+        // ✅ CRITICAL: Fetch and set PersonDto to avoid NPE in ANCService.getHospitalNumber(...)
+        try {
+             PersonResponseDto personResponseDto = personService.getPersonById(patientId);
+            if (personResponseDto == null ) {
+                throw new IllegalArgumentException("Person not found for ID: " + patientId);
+            }
+            dto.setPersonDto(personDto);
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not retrieve person data for ANC sync", e);
+        }
+
+        // --- Map all other fields ---
+        dto.setAncNo((String) ancData.get("ancNo"));
+        dto.setAncSetting((String) ancData.get("ancSetting"));
+        dto.setCommunitySetting((String) ancData.get("communitySetting"));
+        dto.setFirstAncDate(parseDate(ancData.get("enrollmentDate"))); // maps to firstAncDate
+        dto.setGravida(convertToInteger(ancData.get("gravida")));
+        dto.setParity(convertToInteger(ancData.get("parity")));
+        dto.setLMP(parseDate(ancData.get("lmp")));
+        dto.setExpectedDeliveryDate(parseDate(ancData.get("expectedDeliveryDate")));
+        dto.setGAWeeks(convertToInteger(ancData.get("gAWeeks")));
+        dto.setHivDiognosicTime((String) ancData.get("hivDiognosicTime"));
+        dto.setStaticHivStatus((String) ancData.get("staticHivStatus"));
+        dto.setTestedSyphilis((String) ancData.get("testedSyphilis"));
+        dto.setTestResultSyphilis((String) ancData.get("testResultSyphilis"));
+        dto.setTreatedSyphilis((String) ancData.get("treatedSyphilis"));
+        dto.setReferredSyphilisTreatment((String) ancData.get("referredSyphilisTreatment"));
+
+        // ✅ Safely convert nested objects
+        dto.setPmtctHtsInfo(convertAncToDto(ancData.get("pmtctHtsInfo"), PmtctHtsInfo.class));
+        dto.setPartnerNotification(convertAncToDto(ancData.get("partnerNotification"), PartnerNotification.class));
+
+        // --- Remaining fields ---
+        dto.setPreviouslyKnownHivStatus((String) ancData.get("previouslyKnownHivStatus"));
+        dto.setCurrentlyOnArt((String) ancData.get("currentlyOnArt"));
+
+        dto.setDateOfHepatitisB(parseDate(ancData.get("dateOfHepatitisB")));
+        dto.setHepatitisB((String) ancData.get("hepatitisB"));
+        dto.setTestedHepatitisB((String) ancData.get("testedHepatitisB"));
+        dto.setTreatedHepatitisB((String) ancData.get("treatedHepatitisB"));
+        dto.setReferredHepatitisB((String) ancData.get("referredHepatitisB"));
+
+        dto.setDateOfHepatitisC(parseDate(ancData.get("dateOfHepatitisC")));
+        dto.setHepatitisC((String) ancData.get("hepatitisC"));
+        dto.setTestedHepatitisC((String) ancData.get("testedHepatitisC"));
+        dto.setTreatedHepatitisC((String) ancData.get("treatedHepatitisC"));
+        dto.setReferredHepatitisC((String) ancData.get("referredHepatitisC"));
+
+        dto.setFacilityEnrolledIn((String) ancData.get("facilityEnrolledIn"));
+
+        return dto;
+    }
+    private DeliveryRequestDto createDeliveryRequestDto(Map<String, Object> deliveryData) {
+        DeliveryRequestDto dto = new DeliveryRequestDto();
+        dto.setAncNo((String) deliveryData.get("ancNo"));
+        dto.setDateOfDelivery(parseDate(deliveryData.get("dateOfDelivery")));
+        dto.setBookingStatus((String) deliveryData.get("bookingStatus"));
+        dto.setGAWeeks((Integer) deliveryData.get("gAWeeks"));
+        dto.setRomDeliveryInterval((String) deliveryData.get("romDeliveryInterval"));
+        dto.setModeOfDelivery((String) deliveryData.get("modeOfDelivery"));
+        dto.setEpisiotomy((String) deliveryData.get("episiotomy"));
+        dto.setVaginalTear((String) deliveryData.get("vaginalTear"));
+        dto.setFeedingDecision((String) deliveryData.get("feedingDecision"));
+        dto.setMaternalOutcome((String) deliveryData.get("maternalOutcome"));
+        dto.setChildGivenArvWithin72((String) deliveryData.get("childGivenArvWithin72"));
+        dto.setChildStatus((String) deliveryData.get("childStatus"));
+        dto.setHivExposedInfantGivenHbWithin24hrs((String) deliveryData.get("hivExposedInfantGivenHbWithin24hrs"));
+        dto.setNonHbvExposedInfantGivenHbWithin24hrs((String) deliveryData.get("nonHbvExposedInfantGivenHbWithin24hrs"));
+        dto.setDeliveryTime((String) deliveryData.get("deliveryTime"));
+        dto.setOnArt((String) deliveryData.get("onArt"));
+        dto.setArtStartedLdWard((String) deliveryData.get("artStartedLdWard"));
+        dto.setHBStatus((String) deliveryData.get("HBStatus"));
+        dto.setHCStatus((String) deliveryData.get("HCStatus"));
+        dto.setReferalSource((String) deliveryData.get("referalSource"));
+        dto.setNumberOfInfantsAlive((Integer) deliveryData.get("numberOfInfantsAlive"));
+        dto.setNumberOfInfantsDead((Integer) deliveryData.get("numberOfInfantsDead"));
+        dto.setPersonUuid((String) deliveryData.get("personUuid"));
+        dto.setPlaceOfDelivery((String) deliveryData.get("placeOfDelivery"));
+        return dto;
+    }
+    private PartnerInformation createPartnerInformation(Map<String, Object> partnerData) {
+        PartnerInformation info = new PartnerInformation();
+
+        info.setFullName((String) partnerData.get("fullName"));
+        info.setDateOfBirth(parseDate(partnerData.get("dateOfBirth")));
+        info.setPreTestCounseled((String) partnerData.get("preTestCounseled"));
+        info.setAcceptHivTest((String) partnerData.get("acceptHivTest"));
+        info.setPostTestCounseled((String) partnerData.get("postTestCounseled"));
+        info.setHbStatus((String) partnerData.get("hbStatus"));
+        info.setHcStatus((String) partnerData.get("hcStatus"));
+        info.setSyphillisStatus((String) partnerData.get("syphillisStatus"));
+        info.setReferredTo((String) partnerData.get("referredTo"));
+        info.setReferredToOthers((String) partnerData.get("referredToOthers"));
+        info.setAge((Integer) partnerData.get("age"));
+        info.setHivStatus((String) partnerData.get("hivStatus"));
+        info.setDateConfirmedHivTest(parseDate(partnerData.get("dateConfirmedHivTest")));
+
+        return info;
+    }
+    private InfantDto createInfantDto(Map<String, Object> infantData) {
+        return InfantDto.builder()
+                .dateOfDelivery(parseDate(infantData.get("dateOfDelivery")))
+                .firstName((String) infantData.get("firstName"))
+                .middleName((String) infantData.get("middleName"))
+                .surname((String) infantData.get("surname"))
+                .sex((String) infantData.get("sex"))
+                .nin((String) infantData.get("nin"))
+                .id((Long) infantData.get("id"))
+                .hospitalNumber((String) infantData.get("hospitalNumber"))
+                .uuid((String) infantData.get("uuid"))
+                .ancNo((String) infantData.get("ancNo"))
+                .infantOutcomeAt18Months((String) infantData.get("infantOutcomeAt18Months"))
+                .personUuid((String) infantData.get("personUuid"))
+                .bodyWeight((Double) infantData.get("bodyWeight"))
+                .ctxStatus((String) infantData.get("ctxStatus"))
+                .infantArvDto((InfantArvDto) infantData.get("infantArvDto"))
+                .infantPCRTestDto((InfantPCRTestDto) infantData.get("infantPCRTestDto"))
+                .build();
+    }
+        private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data) {
+            InfantVisitationConsolidatedDto dto = new InfantVisitationConsolidatedDto();
+            dto.setInfantVisitRequestDto((InfantVisitRequestDto) data.get("infantVisitRequestDto"));
+            dto.setInfantMotherArtDto((InfantMotherArtDto) data.get("infantMotherArtDto"));
+            dto.setInfantArvDto((InfantArvDto) data.get("infantArvDto"));
+            dto.setInfantPCRTestDto((InfantPCRTestDto) data.get("infantPCRTestDto"));
+            dto.setInfantRapidAntiBodyTestDto((InfantRapidAntiBodyTestDto) data.get("infantRapidAntiBodyTestDto"));
+            return dto;
+        }
+    private PmtctVisitRequestDto createPmtctVisitRequestDto(Map<String, Object> visitData) {
+        return PmtctVisitRequestDto.builder()
+                .id((Long) visitData.get("id"))
+                .ancNo((String) visitData.get("ancNo"))
+                .enteryPoint((String) visitData.get("enteryPoint"))
+                .dateOfInitialVisit(parseDate(visitData.get("dateOfInitialVisit")))
+                .dateOfVisit(parseDate(visitData.get("dateOfVisit")))
+                .dateOfDelivery(parseDate(visitData.get("dateOfDelivery")))
+                .fpCounseling((String) visitData.get("fpCounseling"))
+                .fpMethod((String) visitData.get("fpMethod"))
+                .timeOfViralLoad((String) visitData.get("timeOfViralLoad"))
+                .dateOfViralLoad(parseDate(visitData.get("dateOfViralLoad")))
+                .gaOfViralLoad((Integer) visitData.get("gaOfViralLoad"))
+                .resultOfViralLoad((Integer) visitData.get("resultOfViralLoad"))
+                .dsd((String) visitData.get("dsd"))
+                .dsdOption((String) visitData.get("dsdOption"))
+                .dsdModel((String) visitData.get("dsdModel"))
+                .maternalOutcome((String) visitData.get("maternalOutcome"))
+                .dateOfmeternalOutcome(parseDate(visitData.get("dateOfmeternalOutcome")))
+                .visitStatus((String) visitData.get("visitStatus"))
+                .transferTo((String) visitData.get("transferTo"))
+                .nextAppointmentDate(parseDate(visitData.get("nextAppointmentDate")))
+                .personUuid((String) visitData.get("personUuid"))
+                .build();
     }
 
     private LocalDate parseDate(Object dateObj) {
