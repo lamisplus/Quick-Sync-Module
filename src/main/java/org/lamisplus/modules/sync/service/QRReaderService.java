@@ -9,12 +9,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
+import org.lamisplus.modules.hiv.domain.entity.Regimen;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
+import org.lamisplus.modules.hiv.repositories.RegimenRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
 import org.lamisplus.modules.hts.service.*;
 import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
-
 import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.patient.service.PersonService;
 import org.lamisplus.modules.pmtct.domain.dto.*;
@@ -59,6 +60,7 @@ public class QRReaderService {
     private final PersonRepository personRepository;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
+    private final RegimenRepository regimenRepository;
 
     private final ObjectMapper objectMapper;
 
@@ -235,27 +237,27 @@ public class QRReaderService {
                                     }
                                     if (ancField != null) {
                                         fieldActions.put(ancField, () -> {
-                                            ANCRequestDto dto = createAnc(ancData, String.valueOf(clientId),patientId,personDto);
+                                            ANCRequestDto dto = createAnc(ancData, patientUuid,patientId,personDto);
                                             ancService.save(dto);
                                         });
                                     }
-//                                    if (childFollowupVisitField != null) {
-//                                        fieldActions.put(childFollowupVisitField, () -> {
-//                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
-//                                            infantVisitService.saveConsolidation(dto,dto.getInfantRapidAntiBodyTestDto());
-//                                        });
-//                                    }
+                                    if (childFollowupVisitField != null) {
+                                        fieldActions.put(childFollowupVisitField, () -> {
+                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
+                                            infantVisitService.saveConsolidation(dto,dto.getInfantRapidAntiBodyTestDto());
+                                        });
+                                    }
                                     if (labourDeliveryField != null) {
                                         fieldActions.put(labourDeliveryField, () -> {
                                             DeliveryRequestDto dto = createDeliveryRequestDto(labourDeliveryData,patientUuid);
                                             deliveryService.save(dto);
                                         });
                                     }
-//                                    if (motherFollowupVisitField != null) {
-//                                        fieldActions.put(motherFollowupVisitField, () -> {
-//                                            pmtctVisitService.save((PmtctVisitRequestDto) motherFollowupVisitData);
-//                                        });
-//                                    }
+                                    if (motherFollowupVisitField != null) {
+                                        fieldActions.put(motherFollowupVisitField, () -> {
+                                            pmtctVisitService.save(objectMapper.convertValue(motherFollowupVisitData,PmtctVisitRequestDto.class));
+                                        });
+                                    }
                                     if (partnerRegistrationField != null) {
                                         fieldActions.put(partnerRegistrationField, () -> {
                                             PartnerInformation dto = createPartnerInformation(partnerRegistrationData);
@@ -839,6 +841,8 @@ public class QRReaderService {
     }
 
     private ANCRequestDto createAnc(Map<String, Object> ancData, String personUuid,Long patientId,PersonDto personDto) {
+        System.out.println("createAnc params: "+personUuid+"-"+patientId+"-"+personDto);
+        System.out.println("ANC Data: "+ancData);
         if (ancData == null) {
             throw new IllegalArgumentException("ancData cannot be null");
         }
@@ -904,6 +908,8 @@ public class QRReaderService {
         return dto;
     }
     private DeliveryRequestDto createDeliveryRequestDto(Map<String, Object> deliveryData, String patientUuid) {
+        System.out.println("Delivery: "+deliveryData+"-"+patientUuid);
+
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule()); // Support for Java 8 date/time types
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -942,6 +948,8 @@ public class QRReaderService {
     }
 
     private PartnerInformation createPartnerInformation(Map<String, Object> partnerData) {
+        System.out.println("Partner: "+partnerData);
+
         PartnerInformation info = new PartnerInformation();
 
         info.setFullName(getString(partnerData.get("fullName")));
@@ -998,15 +1006,38 @@ public class QRReaderService {
                 .infantPCRTestDto((InfantPCRTestDto) infantData.get("infantPCRTestDto"))
                 .build();
     }
-        private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data) {
-            InfantVisitationConsolidatedDto dto = new InfantVisitationConsolidatedDto();
-            dto.setInfantVisitRequestDto((InfantVisitRequestDto) data.get("infantVisitRequestDto"));
-            dto.setInfantMotherArtDto((InfantMotherArtDto) data.get("infantMotherArtDto"));
-            dto.setInfantArvDto((InfantArvDto) data.get("infantArvDto"));
-            dto.setInfantPCRTestDto((InfantPCRTestDto) data.get("infantPCRTestDto"));
-            dto.setInfantRapidAntiBodyTestDto((InfantRapidAntiBodyTestDto) data.get("infantRapidAntiBodyTestDto"));
-            return dto;
+    private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data) {
+        System.out.println("child followup: "+data);
+        InfantVisitationConsolidatedDto dto = new InfantVisitationConsolidatedDto();
+        Map<String, Object> infantMotherArtData = (Map<String, Object>) data.get("infantMotherArtDto");
+        if (infantMotherArtData != null) {
+            Object regimenIdObj = infantMotherArtData.get("regimenId");
+            Object regimenTypeIdObj = infantMotherArtData.get("regimenTypeId");
+
+            if (regimenIdObj instanceof String && regimenTypeIdObj != null) {
+                String description = (String) regimenIdObj;
+                Long regimenTypeId = convertToLong(regimenTypeIdObj);
+                System.out.println("description: "+description+"-regimenTypeId-"+regimenTypeIdObj);
+                if (regimenTypeId != null) {
+                    Long actualRegimenId = regimenRepository
+                            .findByRegimenTypeIdAndDescription(regimenTypeId, description)
+                            .map(Regimen::getId)
+                            .orElse(null);
+                    System.out.println("Actual regimenId"+actualRegimenId);
+                    infantMotherArtData.put("regimenId", actualRegimenId);
+                    System.out.println("infantMotherArtData After updating Actual regimenId"+infantMotherArtData);
+
+                }
+            }
         }
+        dto.setInfantVisitRequestDto(objectMapper.convertValue(data.get("infantVisitRequestDto"), InfantVisitRequestDto.class));
+        dto.setInfantMotherArtDto(objectMapper.convertValue(infantMotherArtData, InfantMotherArtDto.class));
+        dto.setInfantArvDto(objectMapper.convertValue(data.get("infantArvDto"), InfantArvDto.class));
+        dto.setInfantPCRTestDto(objectMapper.convertValue(data.get("infantPCRTestDto"), InfantPCRTestDto.class));
+        dto.setInfantRapidAntiBodyTestDto(objectMapper.convertValue(data.get("infantRapidTestDTO"), InfantRapidAntiBodyTestDto.class));
+
+        return dto;
+    }
     private PmtctVisitRequestDto createPmtctVisitRequestDto(Map<String, Object> visitData) {
         return PmtctVisitRequestDto.builder()
                 .id((Long) visitData.get("id"))
