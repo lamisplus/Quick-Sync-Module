@@ -1104,8 +1104,7 @@ public class QRReaderService {
         dto.setInfantMotherArtDto(objectMapper.convertValue(infantMotherArtData, InfantMotherArtDto.class));
         dto.setInfantArvDto(objectMapper.convertValue(data.get("infantArvDto"), InfantArvDto.class));
         dto.setInfantPCRTestDto(objectMapper.convertValue(data.get("infantPCRTestDto"), InfantPCRTestDto.class));
-        dto.setInfantRapidAntiBodyTestDto(objectMapper.convertValue(data.get("infantRapidTestDTO"), InfantRapidAntiBodyTestDto.class));
-
+        dto.setInfantRapidAntiBodyTestDto(objectMapper.convertValue(data.get("infantRapidAntiBodyTestDto"), InfantRapidAntiBodyTestDto.class));
         return dto;
     }
     private PmtctVisitRequestDto createPmtctVisitRequestDto(Map<String, Object> visitData) {
