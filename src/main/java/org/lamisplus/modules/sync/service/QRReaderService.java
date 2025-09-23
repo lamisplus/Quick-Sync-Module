@@ -55,6 +55,7 @@ public class QRReaderService {
     private final DeliveryService deliveryService;
     private final PMTCTEnrollmentService pmtctService;
     private final InfantVisitService infantVisitService;
+    private final InfantService infantService;
     private final PmtctVisitService pmtctVisitService;
     private final ANCRepository ancRepository;
     private final PersonRepository personRepository;
@@ -135,6 +136,7 @@ public class QRReaderService {
                     Object childFollowupVisitField = result.get("childFollowupVisit");
                     Object infantRegistrationField = result.get("infantRegistration");
                     Object labourDeliveryField = result.get("labourDelivery");
+                    Object infantRapidAntibodyTestField = result.get("infantRapidAntibodyTest");
                     Object motherFollowupVisitField = result.get("motherFollowupVisit");
                     Object partnerRegistrationField = result.get("partnerRegistration");
                     Object pmtctEnrollmentField = result.get("pmtctEnrollment");
@@ -157,6 +159,8 @@ public class QRReaderService {
                     Map<String, Object> motherFollowupVisitData = (Map<String, Object>) motherFollowupVisitField;
                     Map<String, Object> partnerRegistrationData = (Map<String, Object>) partnerRegistrationField;
                     Map<String, Object> pmtctEnrollmentData = (Map<String, Object>) pmtctEnrollmentField;
+                    Map<String, Object> infantRapidAntibodyTestData = (Map<String, Object>) pmtctEnrollmentField;
+
 
                     if (personField instanceof Map) {
                         // Process single person data
@@ -277,6 +281,24 @@ public class QRReaderService {
                                             deliveryService.save(dto);
                                         });
                                     }
+                                    if (infantRegistrationField != null) {
+                                        System.out.println("infantRegistration is true");
+                                        fieldActions.put(infantRegistrationField, () -> {
+                                            System.out.println("b44 infantRegistration createInfantDto");
+                                            InfantDto dto = createInfantDto(infantRegistrationData,patientUuid);
+                                            System.out.println("infantRegistration about to save: "+dto);
+                                            infantService.save(dto);
+                                        });
+                                    }else{
+                                        System.out.println("infantRegistration is false");
+                                    }
+//                                    if (infantRapidAntibodyTestField != null) {
+//                                        fieldActions.put(infantRapidAntibodyTestField, () -> {
+//                                            assert infantRapidAntibodyTestData != null;
+//                                            InfantRapidAntiBodyTestDto dto = createInfantRapidAntibodyTest(infantRapidAntibodyTestData);
+//                                            infantVisitService.save(dto);
+//                                        });
+//                                    }
                                     // Execute all actions
                                     fieldActions.forEach((field, action) -> {
                                         if (field != null) {
@@ -755,8 +777,8 @@ public class QRReaderService {
 
     private PMTCTEnrollmentRequestDto createPmtctEnrollmentDto(Map<String, Object> pmtctData, PersonDto personDto, String patientUuid) {
         System.out.println("personDtossss: " + pmtctData + personDto + patientUuid);
-        Optional<Person> person =  personRepository.findByUuid(patientUuid);
-        System.out.println("person::: "+person);
+        Optional<Person> person = personRepository.findByUuid(patientUuid);
+        System.out.println("person::: " + person);
 
         Long id = null;
         Object idObj = pmtctData.get("id");
@@ -766,7 +788,7 @@ public class QRReaderService {
                 try {
                     id = Long.valueOf(idStr);
                 } catch (NumberFormatException e) {
-                    System.out.println("Invalid ID format: {}"+idStr);
+                    System.out.println("Invalid ID format: " + idStr);
                 }
             }
         } else if (idObj instanceof Number) {
@@ -777,11 +799,11 @@ public class QRReaderService {
         Object regimenTypeIdObj = pmtctData.get("regimenTypeId");
         if (regimenTypeIdObj instanceof String) {
             String regimenStr = (String) regimenTypeIdObj;
-            if (!regimenStr.trim().isEmpty()) {
+            if (regimenStr != null && !regimenStr.trim().isEmpty()) {
                 try {
                     regimenTypeId = Long.valueOf(regimenStr);
                 } catch (NumberFormatException e) {
-                    System.out.println("Invalid regimenTypeId format: {}"+ regimenStr);
+                    System.out.println("Invalid regimenTypeId format: " + regimenStr);
                 }
             }
         } else if (regimenTypeIdObj instanceof Number) {
@@ -790,35 +812,42 @@ public class QRReaderService {
 
         // Ensure personUuid is present
         String personUuid = patientUuid;
-
         if (personUuid == null || personUuid.trim().isEmpty()) {
             throw new RuntimeException("Unable to resolve personUuid from input data.");
         }
 
         return PMTCTEnrollmentRequestDto.builder()
                 .id(id)
-                .ancNo((String) pmtctData.get("ancNo"))
-                .pmtctEnrollmentDate(parseDate(pmtctData.get("pmtctEnrollmentDate")))
+                .ancNo(getString(pmtctData, "ancNo"))
+                .pmtctEnrollmentDate(parseDate(getString(pmtctData, "pmtctEnrollmentDate")))
                 .gravida(convertToInteger(pmtctData.get("gravida")))
-                .gAWeeks(convertToInteger(pmtctData.get("gAWeeks")))
-                .entryPoint((String) pmtctData.get("entryPoint"))
-                .artStartDate(parseDate(pmtctData.get("artStartDate")))
-                .artStartTime((String) pmtctData.get("artStartTime"))
-                .tbStatus((String) pmtctData.get("tbStatus"))
+                .gAWeeks(convertToInteger(pmtctData.get("gaweeks")))
+                .entryPoint(getString(pmtctData, "entryPoint"))
+                .artStartDate(parseDate(getString(pmtctData, "artStartDate")))
+                .artStartTime(getString(pmtctData, "artStartTime"))
+                .tbStatus(getString(pmtctData, "tbStatus"))
                 .personDto(personDto)
-                .pmtctType((String) pmtctData.get("pmtctType"))
-                .personUuid(patientUuid)
-                .hivStatus((String) pmtctData.get("hivStatus"))
-                .lmp(parseDate(pmtctData.get("lmp")))
-                .motherArtInitiationTime((String) pmtctData.get("motherArtInitiationTime"))
+                .pmtctType(getString(pmtctData, "pmtctType"))
+                .personUuid(personUuid)
+                .hivStatus(getString(pmtctData, "hivStatus"))
+                .lmp(parseDate(getString(pmtctData, "lmp")))
+                .motherArtInitiationTime(getString(pmtctData, "motherArtInitiationTime"))
                 .regimenTypeId(regimenTypeId)
-                .regimenId((String) pmtctData.get("regimenId"))
-                .hepatitisB((String) pmtctData.get("hepatitisB"))
-                .urinalysis((String) pmtctData.get("urinalysis"))
-                .timeOfHivDiagnosis((String) pmtctData.get("timeOfHivDiagnosis"))
-                .dateOfDelivery((String) pmtctData.get("dateOfDelivery"))
-                .expectedDeliveryDate((String) pmtctData.get("expectedDeliveryDate"))
+                .regimenId(getString(pmtctData, "regimenId"))
+                .hepatitisB(getString(pmtctData, "hepatitisB"))
+                .urinalysis(getString(pmtctData, "urinalysis"))
+                .timeOfHivDiagnosis(getString(pmtctData, "timeOfHivDiagnosis"))
+                .dateOfDelivery(getString(pmtctData, "dateOfDelivery"))
+                .expectedDeliveryDate(getString(pmtctData, "expectedDeliveryDate"))
                 .build();
+    }
+
+    private LocalDate parseDate(String dateStr) {
+        try {
+            return dateStr != null ? LocalDate.parse(dateStr) : null;
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
 
@@ -973,7 +1002,6 @@ public class QRReaderService {
 
         return info;
     }
-
     private String getString(Object value) {
         return value != null ? value.toString() : null;
     }
@@ -991,28 +1019,65 @@ public class QRReaderService {
         return null;
     }
 
-    private InfantDto createInfantDto(Map<String, Object> infantData) {
+    private InfantDto createInfantDto(Map<String, Object> infantData, String patientUuid) {
         return InfantDto.builder()
                 .dateOfDelivery(parseDate(infantData.get("dateOfDelivery")))
-                .firstName((String) infantData.get("firstName"))
-                .middleName((String) infantData.get("middleName"))
-                .surname((String) infantData.get("surname"))
-                .sex((String) infantData.get("sex"))
-                .nin((String) infantData.get("nin"))
-                .id((Long) infantData.get("id"))
-                .hospitalNumber((String) infantData.get("hospitalNumber"))
-                .uuid((String) infantData.get("uuid"))
-                .ancNo((String) infantData.get("ancNo"))
-                .infantOutcomeAt18Months((String) infantData.get("infantOutcomeAt18Months"))
-                .personUuid((String) infantData.get("personUuid"))
-                .bodyWeight((Double) infantData.get("bodyWeight"))
-                .ctxStatus((String) infantData.get("ctxStatus"))
-                .infantArvDto((InfantArvDto) infantData.get("infantArvDto"))
-                .infantPCRTestDto((InfantPCRTestDto) infantData.get("infantPCRTestDto"))
+                .firstName(safeString(infantData.get("firstName")))
+                .middleName(safeString(infantData.get("middleName")))
+                .surname(safeString(infantData.get("surname")))
+                .sex(safeString(infantData.get("sex")))
+                .nin(safeString(infantData.get("nin")))
+                .id(safeParseLong(infantData.get("id")))
+                .hospitalNumber(safeString(infantData.get("hospitalNumber")))
+                .uuid(safeString(infantData.get("uuid")))
+                .ancNo(safeString(infantData.get("ancNo")))
+                .infantOutcomeAt18Months(safeString(infantData.get("infantOutcomeAt18Months")))
+                .personUuid(patientUuid)
+                .bodyWeight(safeParseDouble(infantData.get("bodyWeight")))
+                .ctxStatus(safeString(infantData.get("ctxStatus")))
+                .infantArvDto(objectMapper.convertValue(infantData.get("infantArvDto"),InfantArvDto.class))
+                .infantPCRTestDto(objectMapper.convertValue(infantData.get("infantPCRTestDto"),InfantPCRTestDto.class))
                 .build();
     }
+    private String safeString(Object value) {
+        return value != null ? String.valueOf(value).trim() : null;
+    }
+
+    private Long safeParseLong(Object value) {
+        if (value == null) return null;
+        String str = String.valueOf(value).trim();
+        if (str.isEmpty()) return null;
+        try {
+            return Long.parseLong(str);
+        } catch (NumberFormatException e) {
+            System.out.println("Failed to parse long from: " + str);
+            return null;
+        }
+    }
+
+    private Double safeParseDouble(Object value) {
+        if (value == null) return null;
+        String str = String.valueOf(value).trim();
+        if (str.isEmpty()) return null;
+        try {
+            return Double.parseDouble(str);
+        } catch (NumberFormatException e) {
+            System.out.println("Failed to parse double from: " + str);
+            return null;
+        }
+    }
+
+    private Double parseDouble(Object value) {
+        if (value == null) return null;
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            // Optionally log the error or handle it
+            return null;
+        }
+    }
+
     private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data) {
-        System.out.println("child followup: "+data);
         InfantVisitationConsolidatedDto dto = new InfantVisitationConsolidatedDto();
         Map<String, Object> infantMotherArtData = (Map<String, Object>) data.get("infantMotherArtDto");
         if (infantMotherArtData != null) {
@@ -1067,6 +1132,14 @@ public class QRReaderService {
                 .nextAppointmentDate(parseDate(visitData.get("nextAppointmentDate")))
                 .personUuid((String) visitData.get("personUuid"))
                 .build();
+    }
+    public InfantRapidAntiBodyTestDto createInfantRapidAntibodyTest(Map<String, Object>  data) {
+        InfantRapidAntiBodyTestDto dto = new InfantRapidAntiBodyTestDto();
+        dto.setRapidTestType(String.valueOf( data.get("rapidTestType")));
+        dto.setAncNumber(String.valueOf(data.get("ancNo")));
+        dto.setAgeAtTest(String.valueOf(data.get("ageAtTest")));
+        dto.setDateOfTest(LocalDate.parse(String.valueOf(data.get("ateOfTest"))));
+        return dto;
     }
 
     private LocalDate parseDate(Object dateObj) {
