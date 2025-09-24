@@ -9,9 +9,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
-import org.lamisplus.modules.hiv.domain.entity.Regimen;
+//import org.lamisplus.modules.hiv.domain.entity.Regimen;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
-import org.lamisplus.modules.hiv.repositories.RegimenRepository;
+//import org.lamisplus.modules.hiv.repositories.RegimenRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
 import org.lamisplus.modules.hts.service.*;
 import org.lamisplus.modules.patient.domain.dto.*;
@@ -61,7 +61,7 @@ public class QRReaderService {
     private final PersonRepository personRepository;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
-    private final RegimenRepository regimenRepository;
+//    private final RegimenRepository regimenRepository;
 
     private final ObjectMapper objectMapper;
 
@@ -173,9 +173,25 @@ public class QRReaderService {
                             String patientUuid = String.valueOf(personResponseDto.getUuid());
                             System.out.println(" PersonResponseDto : "+ patientId);
                             // Create and save the RiskStratificationDto
+//                            riskStratificationData.put("personId",patientId);
+                            System.out.println("riskStratificationData : "+ riskStratificationData);
                             RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
+                            System.out.println("patientId : "+ patientId);
                             riskStratificationDto.setPersonId(patientId);
-                            System.out.println("riskStratificationDto : "+ riskStratificationDto);
+                            System.out.println("riskStratificationDto : "+ mapper.writeValueAsString(riskStratificationDto));
+
+                            //start fiz
+                            Person person = personRepository.findById(riskStratificationDto.getPersonId())
+                                    .orElseThrow(() -> new IllegalArgumentException("Person not found with ID: " + riskStratificationDto.getPersonId()));
+
+                            if (person.getUuid() == null || person.getUuid().isEmpty()) {
+                                String generatedUuid = UUID.randomUUID().toString();
+                                person.setUuid(generatedUuid);
+                                personRepository.save(person);
+                            }
+//                                log.warn("Generated missing UUID for personId {}: {}", riskStratificationDto.getPersonId(), generatedUuid);
+                            //finish fiz
+
                             RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
                             // Sync HtsClient if RiskStratificationResponseDto is not null
                             if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
@@ -188,123 +204,79 @@ public class QRReaderService {
                                 if (htsClientDto != null) {
                                     Long clientId = htsClientDto.getId();
                                     String clientUuid = htsClientDto.getHtsClientUUid();
-                                    Map<Object, Runnable> fieldActions = new HashMap<>();
                                     if (preTestField != null) {
-                                        fieldActions.put(preTestField, () -> {
                                             HtsPreTestCounselingDto dto = createPreTestCounseling(preTestData, clientId, patientId);
                                             htsClientService.updatePreTestCounseling(clientId, dto);
-                                        });
                                     }
                                     if (requestResultField != null) {
-                                        fieldActions.put(requestResultField, () -> {
                                             HtsRequestResultDto dto = createRequestResult(requestResultData, clientId, patientId);
                                             htsClientService.updateRequestResult(clientId, dto);
-                                        });
                                     }
                                     if (postTestField != null) {
-                                        fieldActions.put(postTestField, () -> {
                                             PostTestCounselingDto dto = createPostTestCounseling(postTestData, clientId, patientId);
                                             htsClientService.updatePostTestCounselingKnowledgeAssessment(clientId, dto);
-                                        });
                                     }
 
                                     if (recencyField != null) {
-                                        fieldActions.put(recencyField, () -> {
                                             HtsRecencyDto dto = createRecency(recencyData, clientId, patientId);
                                             htsClientService.updateRecency(clientId, dto);
-                                        });
                                     }
                                     if (elicitationField != null) {
-                                        fieldActions.put(elicitationField, () -> {
                                             IndexElicitationDto dto = createIndexElicitation(elicitationData, clientId);
                                             indexElicitationService.save(dto);
-                                        });
                                     }
 
                                     if (familyIndexTestingField != null) {
-                                        fieldActions.put(familyIndexTestingField, () -> {
                                             FamilyIndexTestingRequestDTO dto = createFamilyIndexTesting(familyIndexTestingData, clientUuid, clientId);
                                             familyIndexTestingService.save(dto);
-                                        });
                                     }
                                     if (htsClientReferralField != null) {
-                                        fieldActions.put(htsClientReferralField, () -> {
                                             HtsClientReferralRequestDTO dto = createHtsClientReferral(htsClientReferralData, clientUuid, clientId);
                                             clientReferralService.registerClientReferralForm(dto);
-                                        });
                                     }
                                     if (partnerNotificationServicesField != null) {
-                                        fieldActions.put(partnerNotificationServicesField, () -> {
                                             PersonalNotificationServiceRequestDTO dto = createPartnerNotificationServices(partnerNotificationServicesData, clientUuid, clientId);
                                             pnsService.save(dto);
-                                        });
                                     }
                                     if (ancField != null) {
-                                        fieldActions.put(ancField, () -> {
                                             ANCEnrollementRequestDto dto = createAnc(ancData, patientUuid,patientId,personDto);
                                             ancService.ANCEnrollement(dto);
-                                        });
                                     }
                                     if (childFollowupVisitField != null) {
-                                        fieldActions.put(childFollowupVisitField, () -> {
                                             InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
                                             infantVisitService.saveConsolidation(dto,dto.getInfantRapidAntiBodyTestDto());
-                                        });
                                     }
                                     if (motherFollowupVisitField != null) {
-                                        fieldActions.put(motherFollowupVisitField, () -> {
                                             pmtctVisitService.save(objectMapper.convertValue(motherFollowupVisitData,PmtctVisitRequestDto.class));
-                                        });
                                     }
                                     if (partnerRegistrationField != null) {
-                                        fieldActions.put(partnerRegistrationField, () -> {
                                             PartnerInformation dto = createPartnerInformation(partnerRegistrationData);
                                            Optional<ANC> anc = ancRepository.findANCByPersonUuid(patientUuid);
-
                                             System.out.println("pmtct anc: "+anc);
-
                                             if(anc.isPresent()){
                                                ancService.updateAncWithPartnerInfo(anc.get().getId(), dto);
                                            }
-                                        });
                                     }
                                     if (pmtctEnrollmentField != null) {
-                                        fieldActions.put(pmtctEnrollmentField, () -> {
-                                            PMTCTEnrollmentRequestDto dto = createPmtctEnrollmentDto(pmtctEnrollmentData,personDto,patientUuid);
-                                            System.out.println("DTO to save pmtct enrolmnt: "+dto);
-                                            pmtctService.save(dto);
-                                        });
+                                        PMTCTEnrollmentRequestDto dto = createPmtctEnrollmentDto(pmtctEnrollmentData, personDto, patientUuid);
+                                        boolean enrollmentSaved = pmtctService.save(dto).isPmtctRegStatus(); // capture result
+
+                                        if (enrollmentSaved && labourDeliveryField != null) {
+                                            DeliveryRequestDto ldto = createDeliveryRequestDto(labourDeliveryData, patientUuid);
+                                            deliveryService.save(ldto);
+                                        }
                                     }
-                                    if (labourDeliveryField != null) {
-                                        fieldActions.put(labourDeliveryField, () -> {
-                                            DeliveryRequestDto dto = createDeliveryRequestDto(labourDeliveryData,patientUuid);
-                                            deliveryService.save(dto);
-                                        });
-                                    }
+
                                     if (infantRegistrationField != null) {
-                                        System.out.println("infantRegistration is true");
-                                        fieldActions.put(infantRegistrationField, () -> {
-                                            System.out.println("b44 infantRegistration createInfantDto");
                                             InfantDto dto = createInfantDto(infantRegistrationData,patientUuid);
                                             System.out.println("infantRegistration about to save: "+dto);
                                             infantService.save(dto);
-                                        });
-                                    }else{
-                                        System.out.println("infantRegistration is false");
                                     }
 //                                    if (infantRapidAntibodyTestField != null) {
-//                                        fieldActions.put(infantRapidAntibodyTestField, () -> {
 //                                            assert infantRapidAntibodyTestData != null;
 //                                            InfantRapidAntiBodyTestDto dto = createInfantRapidAntibodyTest(infantRapidAntibodyTestData);
 //                                            infantVisitService.save(dto);
-//                                        });
 //                                    }
-                                    // Execute all actions
-                                    fieldActions.forEach((field, action) -> {
-                                        if (field != null) {
-                                            action.run();
-                                        }
-                                    });
                                 }
                             }
                         }
@@ -494,11 +466,27 @@ public class QRReaderService {
 
 
     private RiskStratificationDto createRiskStratification(Map<String, Object> riskstratificationData) {
+        // 🧠 Parse date of birth
         String dobStr = (String) riskstratificationData.get("dob");
-        LocalDate dob = dobStr != null ? LocalDate.parse(dobStr) : null;
+        LocalDate dob = dobStr != null && !dobStr.trim().isEmpty() ? LocalDate.parse(dobStr) : null;
 
+        // 🧠 Parse visit date
         String visitDateStr = (String) riskstratificationData.get("visitDate");
-        LocalDate visitDate = visitDateStr != null ? LocalDate.parse(visitDateStr) : null;
+        LocalDate visitDate = visitDateStr != null && !visitDateStr.trim().isEmpty() ? LocalDate.parse(visitDateStr) : null;
+
+        // 🧠 Extract riskAssessment as a Map
+        Object rawRiskAssessment = riskstratificationData.get("riskAssessment");
+        Map<String, Object> assessmentMap = null;
+        if (rawRiskAssessment instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> castedMap = (Map<String, Object>) rawRiskAssessment;
+            assessmentMap = castedMap;
+
+            // ✅ Example access: safely retrieve a field
+            String lastHivTestDone = (String) assessmentMap.get("lastHivTestDone");
+            System.out.println("lastHivTestDone: " + lastHivTestDone); // optional debug
+        }
+
         return RiskStratificationDto.builder()
                 .age((Integer) riskstratificationData.get("age"))
                 .entryPoint((String) riskstratificationData.get("entryPoint"))
@@ -508,11 +496,13 @@ public class QRReaderService {
                 .visitDate(visitDate)
                 .dob(dob)
                 .code((String) riskstratificationData.get("code"))
-//                .personId(Long.valueOf((Integer) riskstratificationData.get("personId")))
+                .personId(riskstratificationData.get("personId") != null ? Long.valueOf(riskstratificationData.get("personId").toString()) : null)
                 .source((String) riskstratificationData.get("source"))
-                .riskAssessment(riskstratificationData.get("riskAssessment"))
+                .riskAssessment(assessmentMap) // stored as jsonb
                 .build();
     }
+
+
 
     private HtsPreTestCounselingDto createPreTestCounseling(Map<String, Object> preTestData, Long htsClientId, Long personId) {
         Object knowledgeAssessment = preTestData.get("knowledgeAssessment");
@@ -661,13 +651,65 @@ public class QRReaderService {
                 .build();
     }
     private FamilyIndexTestingRequestDTO createFamilyIndexTesting(Map<String, Object> familyIndexTestingData, String htsClientUuid, Long htsClientId) {
-        FamilyIndexRequestDto familyIndexRequestDto = objectMapper.convertValue(
-                familyIndexTestingData.get("familyIndexRequestDto"),
-                FamilyIndexRequestDto.class
-        );
+        Object rawFamilyIndexDto = familyIndexTestingData.get("familyIndexRequestDto");
+        FamilyIndexRequestDto familyIndexRequestDto = null;
 
-        // 🛡️ Sanitize FamilyTestingTrackerRequestDTOs — remove entries with null facilityId
-        if (familyIndexRequestDto.getFamilyTestingTrackerRequestDTOs() != null) {
+        if (rawFamilyIndexDto instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> familyIndexMap = (Map<String, Object>) rawFamilyIndexDto;
+
+            // 🧼 Sanitize int fields: convert empty strings to null
+            String[] intKeys = {"age", "childNumber"};
+            for (String key : intKeys) {
+                Object value = familyIndexMap.get(key);
+                if (value instanceof String && ((String) value).trim().isEmpty()) {
+                    familyIndexMap.put(key, null);
+                } else if (value != null) {
+                    try {
+                        familyIndexMap.put(key, Integer.parseInt(value.toString()));
+                    } catch (NumberFormatException e) {
+                        familyIndexMap.put(key, null);
+                    }
+                }
+            }
+
+            // 📅 Handle LocalDate fields: yearChildDead, yearMotherDead
+            String[] dateKeys = {"yearChildDead", "yearMotherDead"};
+            for (String key : dateKeys) {
+                Object value = familyIndexMap.get(key);
+                if (value instanceof String) {
+                    String dateStr = ((String) value).trim();
+                    if (dateStr.isEmpty()) {
+                        familyIndexMap.put(key, null);
+                    } else {
+                        try {
+                            familyIndexMap.put(key, LocalDate.parse(dateStr));
+                        } catch (DateTimeParseException e) {
+                            familyIndexMap.put(key, null);
+                        }
+                    }
+                }
+            }
+
+            // 🧹 Clean familyTestingTrackerRequestDTOs
+            Object trackersObj = familyIndexMap.get("familyTestingTrackerRequestDTOs");
+            if (trackersObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> trackers = (List<Map<String, Object>>) trackersObj;
+
+                List<Map<String, Object>> cleanedTrackers = trackers.stream()
+                        .filter(tracker -> tracker != null && !tracker.isEmpty())
+                        .collect(Collectors.toList());
+
+                familyIndexMap.put("familyTestingTrackerRequestDTOs", cleanedTrackers.isEmpty() ? null : cleanedTrackers);
+            }
+
+            // ✅ Deserialize safely
+            familyIndexRequestDto = objectMapper.convertValue(familyIndexMap, FamilyIndexRequestDto.class);
+        }
+
+        // 🛡️ Final cleanup: remove null facilityId entries
+        if (familyIndexRequestDto != null && familyIndexRequestDto.getFamilyTestingTrackerRequestDTOs() != null) {
             familyIndexRequestDto.setFamilyTestingTrackerRequestDTOs(
                     familyIndexRequestDto.getFamilyTestingTrackerRequestDTOs().stream()
                             .filter(tracker -> tracker.getFacilityId() != null)
@@ -693,7 +735,7 @@ public class QRReaderService {
                 .name((String) familyIndexTestingData.get("name"))
                 .phoneNumber((String) familyIndexTestingData.get("phoneNumber"))
                 .recencyTesting((String) familyIndexTestingData.get("recencyTesting"))
-                .familyIndexRequestDto(familyIndexRequestDto) // now sanitized
+                .familyIndexRequestDto(familyIndexRequestDto)
                 .setting((String) familyIndexTestingData.get("setting"))
                 .sex(String.valueOf(convertToLong(familyIndexTestingData.get("sex"))))
                 .state(String.valueOf(convertToLong(familyIndexTestingData.get("state"))))
@@ -702,6 +744,8 @@ public class QRReaderService {
                 .willingToHaveChildrenTestedElseWhere(String.valueOf(familyIndexTestingData.get("willingToHaveChildrenTestedElseWhere")))
                 .build();
     }
+
+
     private HtsClientReferralRequestDTO createHtsClientReferral(Map<String, Object> referralData, String htsClientUuid, Long htsClientId) {
         String addressOfReceivingFacility = (String) referralData.get("addressOfReceivingFacility");
         String addressOfReferringFacility = (String) referralData.get("addressOfReferringFacility");
@@ -929,7 +973,6 @@ public class QRReaderService {
 
 
     private DeliveryRequestDto createDeliveryRequestDto(Map<String, Object> deliveryData, String patientUuid) {
-        System.out.println("Delivery: " + deliveryData + " - " + patientUuid);
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
@@ -1080,26 +1123,22 @@ public class QRReaderService {
     private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data) {
         InfantVisitationConsolidatedDto dto = new InfantVisitationConsolidatedDto();
         Map<String, Object> infantMotherArtData = (Map<String, Object>) data.get("infantMotherArtDto");
-        if (infantMotherArtData != null) {
-            Object regimenIdObj = infantMotherArtData.get("regimenId");
-            Object regimenTypeIdObj = infantMotherArtData.get("regimenTypeId");
-
-            if (regimenIdObj instanceof String && regimenTypeIdObj != null) {
-                String description = (String) regimenIdObj;
-                Long regimenTypeId = convertToLong(regimenTypeIdObj);
-                System.out.println("description: "+description+"-regimenTypeId-"+regimenTypeIdObj);
-                if (regimenTypeId != null) {
-                    Long actualRegimenId = regimenRepository
-                            .findByRegimenTypeIdAndDescription(regimenTypeId, description)
-                            .map(Regimen::getId)
-                            .orElse(null);
-                    System.out.println("Actual regimenId"+actualRegimenId);
-                    infantMotherArtData.put("regimenId", actualRegimenId);
-                    System.out.println("infantMotherArtData After updating Actual regimenId"+infantMotherArtData);
-
-                }
-            }
-        }
+//        if (infantMotherArtData != null) {
+//            Object regimenIdObj = infantMotherArtData.get("regimenId");
+//            Object regimenTypeIdObj = infantMotherArtData.get("regimenTypeId");
+//
+//            if (regimenIdObj instanceof String && regimenTypeIdObj != null) {
+//                String description = (String) regimenIdObj;
+//                Long regimenTypeId = convertToLong(regimenTypeIdObj);
+//                if (regimenTypeId != null) {
+//                    Long actualRegimenId = regimenRepository
+//                            .findByRegimenTypeIdAndDescription(regimenTypeId, description)
+//                            .map(Regimen::getId)
+//                            .orElse(null);
+//                    infantMotherArtData.put("regimenId", actualRegimenId);
+//                }
+//            }
+//        }
         dto.setInfantVisitRequestDto(objectMapper.convertValue(data.get("infantVisitRequestDto"), InfantVisitRequestDto.class));
         dto.setInfantMotherArtDto(objectMapper.convertValue(infantMotherArtData, InfantMotherArtDto.class));
         dto.setInfantArvDto(objectMapper.convertValue(data.get("infantArvDto"), InfantArvDto.class));
