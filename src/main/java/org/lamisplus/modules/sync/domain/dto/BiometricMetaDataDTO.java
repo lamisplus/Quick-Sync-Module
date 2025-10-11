@@ -35,4 +35,6 @@ public class BiometricMetaDataDTO {
 	private String recaptureMessage;
 	private String hashed;
 	private Integer count;
+	private String createdBy;
+	private String lastModifiedBy;
 }

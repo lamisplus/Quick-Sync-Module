@@ -14,8 +14,11 @@ import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
+import org.lamisplus.modules.base.domain.entities.User;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
+import org.lamisplus.modules.base.service.UserService;
 import org.lamisplus.modules.biometric.domain.Biometric;
+import org.lamisplus.modules.biometric.services.BiometricService;
 import org.lamisplus.modules.sync.domain.dto.BiometricMetaDataDTO;
 import org.lamisplus.modules.biometric.repository.BiometricRepository;
 import org.lamisplus.modules.patient.domain.entity.Person;
@@ -70,7 +73,9 @@ public class PersonQuickSyncService {
 
 	private final BiometricDTOToBiometricMapper biometricMapper;
 
+	private final BiometricService biometricService;
 	private final ObjectMapper objectMapper = new ObjectMapper();
+	private final UserService userService;
 
 
 
@@ -85,16 +90,13 @@ public class PersonQuickSyncService {
 				.collect(Collectors.toSet());
 	}
 	public List<BiometricDTO> getBiometricDTO(Long facilityId, LocalDate start, LocalDate end) {
-		// not best practice
-		List<BiometricDTO> data = new ArrayList<BiometricDTO>();
+ 		List<BiometricDTO> data = new ArrayList<BiometricDTO>();
 		try {
-			LOG.info("start fetching biometric details... start {} and end {}", start, end);
 			List<Biometric> biometricRows1 = biometricRepository.findAll().stream()
 					.filter(Objects::nonNull)
 					.filter(biometric -> isPersonCreatedWithinDateRange(start, end, biometric.getCreatedDate()))
 					.collect(Collectors.toList());
-			LOG.info("biometric list {}", biometricRows1.size());
-			
+
 			List<BiometricMetaDataDTO> biometricRows = biometricRows1
 					.stream()
 					.filter(biometric -> biometric.getFacilityId() != null
@@ -103,7 +105,6 @@ public class PersonQuickSyncService {
 					)
 					.map(biometricDTOMapper)
 					.collect(Collectors.toList());
-			LOG.info("biometricRows:{}", biometricRows.size());
 			Set<String> persons = biometricRows
 					.stream()
 					.map(BiometricMetaDataDTO::getPersonUuid).collect(Collectors.toSet());
@@ -211,11 +212,6 @@ public class PersonQuickSyncService {
 		
 	}
 	
-	
-//	public Object importBiometricData(Long facility, MultipartFile file) {
-//
-//	}
-	
 	public ByteArrayOutputStream generateBiometricData(HttpServletResponse response, Long facilityId, LocalDate start, LocalDate end) {
 		ByteArrayOutputStream bao = new ByteArrayOutputStream();
 		try{
@@ -235,12 +231,12 @@ public class PersonQuickSyncService {
 		byte[] bytes = file.getBytes();
 		String data = new String(bytes, StandardCharsets.UTF_8);
 		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+		Optional<User> currentUser = this.userService.getUserWithRoles();
+		User user = currentUser.get();
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.findAndRegisterModules();
 		configureMapperToHandleDate(mapper);
 		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
-		//LOG.info("data imported {}", biometrics);
-		LOG.info("biometric List: " + biometrics.size());
 		AtomicInteger total = new AtomicInteger();
 		int notSave = 0;
 		try {
@@ -255,15 +251,22 @@ public class PersonQuickSyncService {
 						}
 						List<Biometric> currentBiometrics = biometricDTO.getBiometric()
 								.stream()
-								.map(biometricMapper)
-								.map(b -> {
+								.map(meta -> {
+									meta.setCreatedBy(user.getUserName());
+									meta.setLastModifiedBy(user.getUserName());
+									Biometric b = biometricMapper.apply(meta);
 									b.setFacilityId(facilityId);
+									b.setId(meta.getQSyncId());
+									b.setCreatedBy(meta.getCreatedBy());
+									b.setLastModifiedBy(meta.getLastModifiedBy());
+									System.out.println("b before return4: "+b);
 									return b;
 								})
 								.collect(Collectors.toList());
+
+
 						currentBiometrics.parallelStream().forEach(b ->
 						{
-							LOG.info("id {}", b.getId());
 							List<Biometric> existBiometric =
 									biometricRepository.findAllByPersonUuid(b.getPersonUuid());
 							boolean alreadySaved = existBiometric.stream()
