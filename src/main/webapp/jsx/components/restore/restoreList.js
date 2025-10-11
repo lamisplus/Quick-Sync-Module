@@ -132,8 +132,12 @@ const RestoreList = props => {
         title="Quick Sync Upload List "
         columns={[
           { title: "Facility Name", field: "name" },
-          { title: "Table Name", field: "url", filtering: false },
-          { title: "No of records", field: "uploadSize", filtering: false },
+          { title: "Upload Size", field: "uploadSize", filtering: false },
+          {
+            title: "Number of records",
+            field: "recordsCount",
+            filtering: false,
+          },
           { title: "Date of Upload ", field: "date", filtering: false },
           { title: "Status", field: "status", filtering: false },
         ]}
@@ -142,9 +146,10 @@ const RestoreList = props => {
           syncList?.map(row => ({
             name: row.filename,
             url: row.tableName,
-            uploadSize: row.fileSize,
+            uploadSize: row.fileSize + "MB",
             date: row.dateCreated.replace("T", " "),
             status: <Badge color="info">{row.status}</Badge>,
+            recordsCount: row.recordsCount || "N/A",
           }))
         }
         options={{

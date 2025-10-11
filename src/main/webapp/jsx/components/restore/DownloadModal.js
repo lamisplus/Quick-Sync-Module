@@ -4,7 +4,6 @@ import {
   ModalHeader,
   ModalBody,
   Form,
-  FormFeedback,
   Row,
   Col,
   Card,
@@ -15,17 +14,14 @@ import {
 } from "reactstrap";
 import MatButton from "@material-ui/core/Button";
 import { makeStyles } from "@material-ui/core/styles";
-import SaveIcon from "@material-ui/icons/Save";
 import CancelIcon from "@material-ui/icons/Cancel";
-import { Alert } from "reactstrap";
-import { Spinner } from "reactstrap";
 import axios from "axios";
 import { token, url as baseUrl } from "../../../api";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { toast } from "react-toastify";
 import FileSaver from "file-saver";
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(theme => ({
   card: {
     margin: theme.spacing(20),
     display: "flex",
@@ -60,7 +56,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const DownloadModal = (props) => {
+const DownloadModal = props => {
   const classes = useStyles();
   let currentDate = new Date().toISOString().split("T")[0];
   const [loading, setLoading] = useState(false);
@@ -68,8 +64,9 @@ const DownloadModal = (props) => {
     facilityId: "",
     startDate: "",
     endDate: "",
-    program: ""
+    program: "",
   });
+  console.log("download for bio: ", download);
   const [organisationUnitName, setOrganisationUnitName] = useState("");
 
   const [errors, setErrors] = useState({});
@@ -83,7 +80,7 @@ const DownloadModal = (props) => {
     setErrors({
       ...temp,
     });
-    return Object.values(temp).every((x) => x === "");
+    return Object.values(temp).every(x => x === "");
   };
 
   const [facilities, setFacilities] = useState([]);
@@ -97,108 +94,103 @@ const DownloadModal = (props) => {
       .get(`${baseUrl}account`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((response) => {
-        // console.log(response.data);
+      .then(response => {
         setFacilities(response.data.applicationUserOrganisationUnits);
       })
-      .catch((error) => {
+      .catch(error => {
         //console.log(error);
       });
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = e => {
     const { name, value, innerText, id } = e.target;
 
-    if (innerText !== "" && id === "facility" ) {
-      console.log(innerText)
+    if (innerText !== "" && id === "facility") {
+      console.log(innerText);
       setOrganisationUnitName(innerText);
     }
 
     setDownload({
       ...download,
-      [name]: value
+      [name]: value,
     });
   };
 
-  const DatabaseRestoreProcess = (e) => {
+  const DatabaseRestoreProcess = e => {
     e.preventDefault();
 
-    //console.log("data", download);
     if (validateInputs()) {
-
       if (download.program === "patient") {
         axios
-        .get(
-          `${baseUrl}quick-sync/export/person-data?facilityId=${download.facilityId}&startDate=${download.startDate}&endDate=${download.endDate}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "blob",
-          }
-        )
-        .then((response) => {
-          //console.log(response);
-          setLoading(false);
-          const fileName = `${organisationUnitName} ${download.program} ${currentDate}`;
-          const responseData = response.data;
-          let blob = new Blob([responseData], {
-            type: "application/octet-stream",
-          });
+          .get(
+            `${baseUrl}quick-sync/export/person-data?facilityId=${download.facilityId}&startDate=${download.startDate}&endDate=${download.endDate}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: "blob",
+            }
+          )
+          .then(response => {
+            //console.log(response);
+            setLoading(false);
+            const fileName = `${organisationUnitName} ${download.program} ${currentDate}`;
+            const responseData = response.data;
+            let blob = new Blob([responseData], {
+              type: "application/octet-stream",
+            });
 
-          FileSaver.saveAs(blob, `${fileName}.json`);
-          toast.success("Patient Json generated successfully");
-        })
-        .catch((error) => {
-          setLoading(false);
-          if (error.response && error.response.data) {
-            let errorMessage =
-              error.response.data.apierror &&
-              error.response.data.apierror.message !== ""
-                ? error.response.data.apierror.message
-                : "Something went wrong, please try again";
-            toast.error(errorMessage);
-          } else {
-            toast.error("Something went wrong. Please try again...");
-          }
-        });
-      }else if (download.program === "biometrics") {
+            FileSaver.saveAs(blob, `${fileName}.json`);
+            toast.success("Patient Json generated successfully");
+          })
+          .catch(error => {
+            setLoading(false);
+            if (error.response && error.response.data) {
+              let errorMessage =
+                error.response.data.apierror &&
+                error.response.data.apierror.message !== ""
+                  ? error.response.data.apierror.message
+                  : "Something went wrong, please try again";
+              toast.error(errorMessage);
+            } else {
+              toast.error("Something went wrong. Please try again...");
+            }
+          });
+      } else if (download.program === "biometrics") {
         axios
-        .get(
-          `${baseUrl}quick-sync/export/biometric-data?facilityId=${download.facilityId}&startDate=${download.startDate}&endDate=${download.endDate}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "blob",
-          }
-        )
-        .then((response) => {
-          //console.log(response);
-          setLoading(false);
-          const fileName = `${organisationUnitName} ${download.program} ${currentDate}`;
-          const responseData = response.data;
-          let blob = new Blob([responseData], {
-            type: "application/octet-stream",
-          });
+          .get(
+            `${baseUrl}quick-sync/export/biometric-data?facilityId=${download.facilityId}&startDate=${download.startDate}&endDate=${download.endDate}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: "blob",
+            }
+          )
+          .then(response => {
+            //console.log(response);
+            setLoading(false);
+            const fileName = `${organisationUnitName} ${download.program} ${currentDate}`;
+            const responseData = response.data;
+            let blob = new Blob([responseData], {
+              type: "application/octet-stream",
+            });
 
-          FileSaver.saveAs(blob, `${fileName}.json`);
-          toast.success("Biometrics Json generated successfully");
-        })
-        .catch((error) => {
-          setLoading(false);
-          if (error.response && error.response.data) {
-            let errorMessage =
-              error.response.data.apierror &&
-              error.response.data.apierror.message !== ""
-                ? error.response.data.apierror.message
-                : "Something went wrong, please try again";
-            toast.error(errorMessage);
-          } else {
-            toast.error("Something went wrong. Please try again...");
-          }
-        });
-      }else {
+            FileSaver.saveAs(blob, `${fileName}.json`);
+            toast.success("Biometrics Json generated successfully");
+          })
+          .catch(error => {
+            setLoading(false);
+            if (error.response && error.response.data) {
+              let errorMessage =
+                error.response.data.apierror &&
+                error.response.data.apierror.message !== ""
+                  ? error.response.data.apierror.message
+                  : "Something went wrong, please try again";
+              toast.error(errorMessage);
+            } else {
+              toast.error("Something went wrong. Please try again...");
+            }
+          });
+      } else {
         return null;
       }
-
-
     }
     props.togglestatus();
   };
@@ -235,7 +227,7 @@ const DownloadModal = (props) => {
                         }}
                       >
                         <option value={""}></option>
-                        {facilities.map((value) => (
+                        {facilities.map(value => (
                           <option
                             key={value.id}
                             value={value.organisationUnitId}
@@ -272,7 +264,6 @@ const DownloadModal = (props) => {
                         <option value={"biometrics"}>Biometrics</option>
                         {/*<option value={"hts"}>HTS</option>*/}
                         <option value={"patient"}>Patient</option>
-
                       </Input>
                       {errors.program !== "" ? (
                         <span style={{ color: "#f85032", fontSize: "11px" }}>
@@ -285,7 +276,7 @@ const DownloadModal = (props) => {
                   </Col>
                 </Row>
                 <Row>
-                <Col md={6}>
+                  <Col md={6}>
                     <FormGroup>
                       <Label>
                         From <span style={{ color: "red" }}> *</span>

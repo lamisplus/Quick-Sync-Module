@@ -132,7 +132,7 @@ const DatabaseRestore = props => {
       const formData = new FormData();
 
       formData.append("file", upload.files);
-
+      console.log("gsr: ", upload.files);
       if (fileName.includes("patient") === true) {
         axios
           .post(
@@ -244,6 +244,9 @@ const DatabaseRestore = props => {
           <ModalHeader toggle={props.togglestatus}>
             Upload JSON File
           </ModalHeader>
+          {/* <ModalHeader toggle={props.togglestatus}>
+            Upload JSON File
+          </ModalHeader> */}
           <ModalBody>
             <Card>
               <CardBody>

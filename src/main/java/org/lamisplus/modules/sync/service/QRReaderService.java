@@ -118,6 +118,7 @@ public class QRReaderService {
             }
         }
         if (!resultList.isEmpty()) {
+            int recordsCount = 0;
             // Iterate over all elements in resultList
             for (Map<String, Object> result : resultList) {
                 if (result.containsKey("person")) {
@@ -163,7 +164,6 @@ public class QRReaderService {
 
 
                     if (personField instanceof Map) {
-                        // Process single person data
                         Map<String, Object> personData = (Map<String, Object>) personField;
                         PersonDto personDto = convertToPersonDto(personData);
                         PersonResponseDto personResponseDto = personService.createPerson(personDto);
@@ -171,16 +171,8 @@ public class QRReaderService {
                         if (personResponseDto != null) {
                             Long patientId = personResponseDto.getId();
                             String patientUuid = String.valueOf(personResponseDto.getUuid());
-                            System.out.println(" PersonResponseDto : "+ patientId);
-                            // Create and save the RiskStratificationDto
-//                            riskStratificationData.put("personId",patientId);
-                            System.out.println("riskStratificationData : "+ riskStratificationData);
                             RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
-                            System.out.println("patientId : "+ patientId);
                             riskStratificationDto.setPersonId(patientId);
-                            System.out.println("riskStratificationDto : "+ mapper.writeValueAsString(riskStratificationDto));
-
-                            //start fiz
                             Person person = personRepository.findById(riskStratificationDto.getPersonId())
                                     .orElseThrow(() -> new IllegalArgumentException("Person not found with ID: " + riskStratificationDto.getPersonId()));
 
@@ -189,11 +181,8 @@ public class QRReaderService {
                                 person.setUuid(generatedUuid);
                                 personRepository.save(person);
                             }
-//                                log.warn("Generated missing UUID for personId {}: {}", riskStratificationDto.getPersonId(), generatedUuid);
-                            //finish fiz
 
                             RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
-                            // Sync HtsClient if RiskStratificationResponseDto is not null
                             if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
                                 HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(personResponseDto, clientIntakeData, patientId, riskStratificationResponseDto.getCode());
                                 htsClientRequestDto.setPersonId(patientId);
@@ -252,7 +241,6 @@ public class QRReaderService {
                                     if (partnerRegistrationField != null) {
                                             PartnerInformation dto = createPartnerInformation(partnerRegistrationData);
                                            Optional<ANC> anc = ancRepository.findANCByPersonUuid(patientUuid);
-                                            System.out.println("pmtct anc: "+anc);
                                             if(anc.isPresent()){
                                                ancService.updateAncWithPartnerInfo(anc.get().getId(), dto);
                                            }
@@ -269,21 +257,22 @@ public class QRReaderService {
 
                                     if (infantRegistrationField != null) {
                                             InfantDto dto = createInfantDto(infantRegistrationData,patientUuid);
-                                            System.out.println("infantRegistration about to save: "+dto);
                                             infantService.save(dto);
                                     }
-//                                    if (infantRapidAntibodyTestField != null) {
-//                                            assert infantRapidAntibodyTestData != null;
-//                                            InfantRapidAntiBodyTestDto dto = createInfantRapidAntibodyTest(infantRapidAntibodyTestData);
-//                                            infantVisitService.save(dto);
-//                                    }
+                                    if (infantRapidAntibodyTestField != null) {
+                                            assert infantRapidAntibodyTestData != null;
+                                            InfantRapidAntiBodyTestDto dto = createInfantRapidAntibodyTest(infantRapidAntibodyTestData);
+                                            infantVisitService.save(dto);
+                                    }
                                 }
                             }
                         }
                     }
+                    recordsCount++;
                 }
+
             }
-            getQuickSyncHistoryDTO(multipartFile, facility, fileSizeInMB, "");
+            getQuickSyncHistoryDTO(multipartFile, facility, fileSizeInMB, recordsCount,"");
         }
 
         return resultList;
@@ -338,12 +327,9 @@ public class QRReaderService {
                 .genderId(((Number) personData.get("genderId")).longValue())
                 .identifier(parseIdentifierList(getList(personData.get("identifier"))))
                 .isDateOfBirthEstimated((Boolean) personData.get("isDateOfBirthEstimated"))
-//                .latitude((Double) personData.get("latitude"))
-//                .longitude((Double) personData.get("longitude"))
                 .maritalStatusId(((Number) personData.get("maritalStatusId")).longValue())
                 .organizationId(((Number) personData.get("organizationId")).longValue())
                 .sexId(((Number) personData.get("sexId")).longValue())
-//                .source((String) personData.get("source"))
                 .surname((String) personData.get("surname"))
                 .uuid((String) personData.get("uuid"))
                 .build();
@@ -390,7 +376,6 @@ public class QRReaderService {
         Long stateId = ((Number) addressData.get("stateId")).longValue();
         String postalCode = (String) addressData.get("postalCode");
         Long countryId = ((Number) addressData.get("countryId")).longValue();
-//        Long organisationUnitId = ((Number) addressData.get("organisationUnitId")).longValue();
         Long organisationUnitId = addressData.containsKey("organisationUnitId")
                 ? ((Number) addressData.get("organisationUnitId")).longValue()
                 : facilityId;
@@ -481,10 +466,7 @@ public class QRReaderService {
             @SuppressWarnings("unchecked")
             Map<String, Object> castedMap = (Map<String, Object>) rawRiskAssessment;
             assessmentMap = castedMap;
-
-            // ✅ Example access: safely retrieve a field
             String lastHivTestDone = (String) assessmentMap.get("lastHivTestDone");
-            System.out.println("lastHivTestDone: " + lastHivTestDone); // optional debug
         }
 
         return RiskStratificationDto.builder()
@@ -785,7 +767,6 @@ public class QRReaderService {
         return dto;
     }
     private PersonalNotificationServiceRequestDTO createPartnerNotificationServices(Map<String, Object> pnsData,String htsClientUuid, Long htsClientId) {
-        System.out.println("params: "+pnsData+" "+htsClientUuid+" "+htsClientId);
         PersonalNotificationServiceRequestDTO dto = new PersonalNotificationServiceRequestDTO();
         Map<String, Object> htsClientInfo = (Map<String, Object>) pnsData.get("htsClientInformation");
         Map<String, Object> contactTracing = (Map<String, Object>) pnsData.get("contactTracing");
@@ -820,10 +801,7 @@ public class QRReaderService {
     }
 
     private PMTCTEnrollmentRequestDto createPmtctEnrollmentDto(Map<String, Object> pmtctData, PersonDto personDto, String patientUuid) {
-        System.out.println("personDtossss: " + pmtctData + personDto + patientUuid);
         Optional<Person> person = personRepository.findByUuid(patientUuid);
-        System.out.println("person::: " + person);
-
         Long id = null;
         Object idObj = pmtctData.get("id");
         if (idObj instanceof String) {
@@ -914,9 +892,6 @@ public class QRReaderService {
     }
 
     private ANCEnrollementRequestDto createAnc(Map<String, Object> ancData, String personUuid, Long patientId, PersonDto personDto) {
-        System.out.println("createAnc params: " + personUuid + "-" + patientId + "-" + personDto + String.valueOf(ancData.get("staticHivStatus")));
-        System.out.println("ANC Data: " + ancData);
-
         if (ancData == null) {
             throw new IllegalArgumentException("ancData cannot be null");
         }
@@ -1025,8 +1000,6 @@ public class QRReaderService {
 
 
     private PartnerInformation createPartnerInformation(Map<String, Object> partnerData) {
-        System.out.println("Partner: "+partnerData);
-
         PartnerInformation info = new PartnerInformation();
 
         info.setFullName(getString(partnerData.get("fullName")));
@@ -1215,7 +1188,7 @@ public class QRReaderService {
 
 
     @NotNull
-    private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize, String tableName) {
+    private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize,int recordsCount, String tableName) {
         QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
                 .status("completed")
                 .filename(file.getOriginalFilename())
@@ -1223,6 +1196,7 @@ public class QRReaderService {
                 .tableName(tableName)
                 .fileSize(filesize)
                 .dateUpdated(LocalDateTime.now())
+                .recordsCount(recordsCount)
                 .build();
         QuickSyncHistory quickSyncHistory = new QuickSyncHistory();
         quickSyncHistory.setFilename(historyDTO.getFilename());
@@ -1232,6 +1206,7 @@ public class QRReaderService {
         quickSyncHistory.setFilename(file.getOriginalFilename());
         quickSyncHistory.setFacilityName(historyDTO.getFacilityName());
         quickSyncHistory.setDateCreated(historyDTO.getDateUpdated());
+        quickSyncHistory.setRecordsCount(recordsCount);
         quickSyncHistoryRepository.save(quickSyncHistory);
         return historyDTO;
     }

@@ -7,7 +7,7 @@
  @Order(1)
  @Installer(name = "schema-installer",
          description = "Installs the required database tables",
-         version = 1)
+         version = 3)
  public class QuickSyncInstaller extends AcrossLiquibaseInstaller {
      public QuickSyncInstaller() {
          super("classpath:installers/sync/schema/schema.xml");

@@ -25,4 +25,5 @@ public class QuickSyncHistory {
 	private LocalDateTime dateCreated;
 	Integer fileSize;
 	private String status;
+	Integer recordsCount;
 }
