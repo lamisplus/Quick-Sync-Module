@@ -1132,7 +1132,7 @@ public class QRReaderService {
                 .timeOfViralLoad((String) visitData.get("timeOfViralLoad"))
                 .dateOfViralLoad(parseDate(visitData.get("dateOfViralLoad")))
                 .gaOfViralLoad((Integer) visitData.get("gaOfViralLoad"))
-                .resultOfViralLoad((Integer) visitData.get("resultOfViralLoad"))
+                .resultOfViralLoad(Long.valueOf((Integer) visitData.get("resultOfViralLoad")))
                 .dsd((String) visitData.get("dsd"))
                 .dsdOption((String) visitData.get("dsdOption"))
                 .dsdModel((String) visitData.get("dsdModel"))
