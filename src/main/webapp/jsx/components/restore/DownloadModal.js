@@ -66,7 +66,6 @@ const DownloadModal = props => {
     endDate: "",
     program: "",
   });
-  console.log("download for bio: ", download);
   const [organisationUnitName, setOrganisationUnitName] = useState("");
 
   const [errors, setErrors] = useState({});
@@ -106,7 +105,6 @@ const DownloadModal = props => {
     const { name, value, innerText, id } = e.target;
 
     if (innerText !== "" && id === "facility") {
-      console.log(innerText);
       setOrganisationUnitName(innerText);
     }
 

@@ -100,7 +100,6 @@ const RestoreList = props => {
       </div>
     );
   };
-  console.log("syncList: ", syncList);
   return (
     <>
       <PageTitle activeMenu="Quick Sync" motherMenu="Sync " />

@@ -153,6 +153,13 @@ public class PersonQuickSyncService {
 	}
 	
 	public QuickSyncHistoryDTO importPersonData(Long facilityId, MultipartFile file) throws IOException {
+		// Check if the file has already been uploaded
+		String fileName = file.getOriginalFilename();
+		Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
+		if(fileExists){
+			throw new IllegalArgumentException("This file has already been uploaded and processed. Please upload a different file.");
+		}
+
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.findAndRegisterModules();
 		configureMapperToHandleDate(mapper);
@@ -292,6 +299,13 @@ Parallel processing implementation for future reference
 //	}
 
 public QuickSyncHistoryDTO importBiometricData(Long facilityId, MultipartFile file) throws IOException {
+	// Check if the file has already been uploaded
+	String fileName = file.getOriginalFilename();
+	Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
+	if(fileExists){
+		throw new IllegalArgumentException("This file has already been uploaded and processed. Please upload a different file.");
+	}
+
 	byte[] bytes = file.getBytes();
 	String data = new String(bytes, StandardCharsets.UTF_8);
 

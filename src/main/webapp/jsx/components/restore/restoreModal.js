@@ -15,14 +15,10 @@ import {
 } from "reactstrap";
 import MatButton from "@material-ui/core/Button";
 import { makeStyles } from "@material-ui/core/styles";
-import SaveIcon from "@material-ui/icons/Save";
 import CancelIcon from "@material-ui/icons/Cancel";
-import { Alert } from "reactstrap";
-import { Spinner } from "reactstrap";
 import axios from "axios";
 import { token, url as baseUrl } from "../../../api";
 import { DropzoneArea } from "material-ui-dropzone";
-import SettingsBackupRestoreIcon from "@material-ui/icons/SettingsBackupRestore";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
 import { toast } from "react-toastify";
 
@@ -64,6 +60,7 @@ const useStyles = makeStyles(theme => ({
 const DatabaseRestore = props => {
   const classes = useStyles();
   const [facilities, setFacilities] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [upload, setUpload] = useState({
@@ -83,6 +80,7 @@ const DatabaseRestore = props => {
 
   useEffect(() => {
     Facilities();
+    getCurrentUser();
   }, []);
 
   const Facilities = () => {
@@ -95,6 +93,19 @@ const DatabaseRestore = props => {
       })
       .catch(error => {
         //console.log(error);
+      });
+  };
+
+  const getCurrentUser = () => {
+    axios
+      .get(`${baseUrl}account`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(response => {
+        setCurrentUser(response.data);
+      })
+      .catch(error => {
+        console.log("Error fetching current user:", error);
       });
   };
 
@@ -113,6 +124,47 @@ const DatabaseRestore = props => {
     });
   };
 
+  const validateBiometricFacility = async (file) => {
+    return new Promise((resolve, reject) => {
+      if (!currentUser || !currentUser.currentOrganisationUnitId) {
+        reject(new Error("User session not found. Please refresh the page."));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const jsonContent = JSON.parse(e.target.result);
+          // Get the current user's facility ID from state
+          const userFacilityId = currentUser.currentOrganisationUnitId;
+
+          // Check each record in the array
+          if (Array.isArray(jsonContent)) {
+            for (let i = 0; i < jsonContent.length; i++) {
+              const record = jsonContent[i];
+              const fileFacilityId = record?.person?.facilityId;
+              // Convert both to numbers for comparison to avoid type mismatch
+              if (fileFacilityId && userFacilityId) {
+                const fileFacilityIdNum = Number(fileFacilityId);
+                const userFacilityIdNum = Number(userFacilityId);
+
+                if (fileFacilityIdNum !== userFacilityIdNum) {
+                  reject(new Error("Upload failed: This file belongs to a different facility. Please ensure you are uploading the correct file for your assigned facility."));
+                  return;
+                }
+              }
+            }
+          }
+          resolve();
+        } catch (error) {
+          reject(new Error("Invalid JSON file format"));
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file);
+    });
+  };
+
   async function syncHistory() {
     axios
       .get(`${baseUrl}quick-sync/history`, {
@@ -124,7 +176,7 @@ const DatabaseRestore = props => {
       .catch(error => {});
   }
 
-  const uploadProcess = e => {
+  const uploadProcess = async e => {
     e.preventDefault();
     if (validateInputs()) {
       let fileName = upload.files.name;
@@ -132,7 +184,17 @@ const DatabaseRestore = props => {
       const formData = new FormData();
 
       formData.append("file", upload.files);
-      console.log("gsr: ", upload.files);
+
+      // Validate biometric file facility before uploading
+      if (fileName.includes("biometrics") === true) {
+        try {
+          await validateBiometricFacility(upload.files);
+        } catch (error) {
+          toast.error(error.message);
+          return;
+        }
+      }
+
       if (fileName.includes("patient") === true) {
         axios
           .post(
@@ -193,7 +255,7 @@ const DatabaseRestore = props => {
               );
             }
           });
-      } else if (fileName.includes("hts") === true) {
+      } else if (fileName.toLowerCase().includes("lamisplus-export") === true) {
         axios
           .post(
             `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,

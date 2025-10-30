@@ -94,7 +94,7 @@ public class QRReaderService {
         // check if the filename exist in quickSyn history
         Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
         if(fileExists){
-            throw new IllegalArgumentException("File with the name " + fileName + " has already been processed");
+            throw new IllegalArgumentException("This file has already been uploaded and processed. Please upload a different file.");
         }
 
         byte[] fileBytes = multipartFile.getBytes();
@@ -165,6 +165,19 @@ public class QRReaderService {
 
                     if (personField instanceof Map) {
                         Map<String, Object> personData = (Map<String, Object>) personField;
+
+                        // Validate that the person's facilityId matches the input facilityId
+                        Object personFacilityIdObj = personData.get("facilityId");
+                        if (personFacilityIdObj != null) {
+                            Long personFacilityId = ((Number) personFacilityIdObj).longValue();
+                            if (!personFacilityId.equals(facilityId)) {
+                                throw new IllegalArgumentException(
+                                    "Upload failed: This file belongs to a different facility. " +
+                                    "Please ensure you are uploading the correct file for your assigned facility."
+                                );
+                            }
+                        }
+
                         PersonDto personDto = convertToPersonDto(personData);
                         PersonResponseDto personResponseDto = personService.createPerson(personDto);
 
