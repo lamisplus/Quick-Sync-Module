@@ -9,10 +9,10 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
-//import org.lamisplus.modules.hiv.domain.entity.Regimen;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
-//import org.lamisplus.modules.hiv.repositories.RegimenRepository;
 import org.lamisplus.modules.hts.domain.dto.*;
+import org.lamisplus.modules.hts.domain.entity.HtsClient;
+import org.lamisplus.modules.hts.repository.*;
 import org.lamisplus.modules.hts.service.*;
 import org.lamisplus.modules.patient.domain.dto.*;
 import org.lamisplus.modules.patient.domain.entity.Person;
@@ -61,6 +61,11 @@ public class QRReaderService {
     private final PersonRepository personRepository;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
+    private final RiskStratificationRepository riskStratificationRepository;
+    private final HtsClientRepository htsClientRepository;
+    private final FamilyIndexTestingRepository familyIndexTestingRepository;
+    private final PersonalNotificationServiceRepository partnerNotificationRepository;
+    private final HtsClientReferralRepository clientReferralRepository;
 //    private final RegimenRepository regimenRepository;
 
     private final ObjectMapper objectMapper;
@@ -1222,5 +1227,304 @@ public class QRReaderService {
         quickSyncHistory.setRecordsCount(recordsCount);
         quickSyncHistoryRepository.save(quickSyncHistory);
         return historyDTO;
+    }
+
+    /**
+     * Process zip file with update logic for HTS data.
+     * This function handles zip files containing HTS client data and implements update logic
+     * to avoid duplicate records by checking existing hospital numbers and risk stratification codes.
+     *
+     * The processing flow is:
+     * 1. Check if hospital number exists in person table
+     *    - If exists: skip person creation, use existing person ID and UUID
+     *    - If not exists: create new person
+     * 2. Check if risk stratification code exists in hts_risk_stratification table
+     *    - If exists: skip risk stratification creation
+     *    - If not exists: create new risk stratification record
+     * 3. Check if HTS client exists with the risk_stratification_code
+     *    - If exists: skip HTS client creation, use existing client ID
+     *    - If not exists: create new HTS client
+     * 4. Update pre-test form data (knowledgeAssessment, riskAssessment, tbScreening, stiScreening, sexPartnerRiskAssessment)
+     * 5. Update request/result form data
+     * 6. Update post-test form data (postTestCounselingKnowledgeAssessment)
+     * 7. Update recency form data
+     *
+     * @param facilityId The ID of the facility uploading the file
+     * @param multipartFile The zip file containing compressed HTS data
+     * @return List of processed data maps
+     * @throws IOException if file reading or decompression fails
+     */
+    public List<Map<String, Object>> processZipFileWithUpdateLogic(Long facilityId, MultipartFile multipartFile) throws IOException {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        ObjectMapper mapper = new ObjectMapper();
+        OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+        String fileName = multipartFile.getOriginalFilename();
+        int fileSizeInMB = (int) Math.ceil(multipartFile.getSize()/(1024.0 * 1024.0));
+
+        // Check if the filename exists in quickSync history
+        Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
+        if(fileExists){
+            throw new IllegalArgumentException("This file has already been uploaded and processed. Please upload a different file.");
+        }
+
+        byte[] fileBytes = multipartFile.getBytes();
+
+        // Convert the byte array to a ZipInputStream
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(fileBytes);
+             ZipInputStream zipInputStream = new ZipInputStream(byteArrayInputStream)) {
+            ZipEntry entry;
+            while ((entry = zipInputStream.getNextEntry()) != null) {
+                // Check if the entry is a file
+                if (!entry.isDirectory()) {
+                    String base64CompressedData = readZipEntry(zipInputStream);
+                    String decompressedData = decompressAndDecode(base64CompressedData);
+                    // Convert decompressed JSON data to a Map
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    Map<String, Object> jsonData = objectMapper.readValue(decompressedData, new TypeReference<Map<String, Object>>() {
+                    });
+                    // Add the parsed JSON data to the result list
+                    resultList.add(jsonData);
+                }
+            }
+        }
+
+        if (!resultList.isEmpty()) {
+            int recordsCount = 0;
+            // Iterate over all elements in resultList
+            for (Map<String, Object> result : resultList) {
+                if (result.containsKey("person")) {
+                    Object personField = result.get("person");
+                    Object clientIntakeField = result.get("clientIntake");
+                    Object riskStratificationField = result.get("riskStratification");
+                    Object preTestField = result.get("preTest");
+                    Object requestResultField = result.get("RequestResult");
+                    Object postTestField = result.get("postTest");
+                    Object recencyField = result.get("recency");
+                    Object familyIndexTestingField = result.get("familyIndexTesting");
+                    Object htsClientReferralField = result.get("htsClientReferral");
+                    Object partnerNotificationServicesField = result.get("partnerNotificationServices");
+
+                    // Safely cast fields to their expected types
+                    Map<String, Object> personData = (Map<String, Object>) personField;
+                    Map<String, Object> clientIntakeData = (Map<String, Object>) clientIntakeField;
+                    Map<String, Object> riskStratificationData = (Map<String, Object>) riskStratificationField;
+                    Map<String, Object> preTestData = (Map<String, Object>) preTestField;
+                    Map<String, Object> requestResultData = (Map<String, Object>) requestResultField;
+                    Map<String, Object> postTestData = (Map<String, Object>) postTestField;
+                    Map<String, Object> recencyData = (Map<String, Object>) recencyField;
+                    Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
+                    Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
+                    Map<String, Object> partnerNotificationServicesData = (Map<String, Object>) partnerNotificationServicesField;
+
+                    if (personField instanceof Map) {
+                        // Validate that the person's facilityId matches the input facilityId
+                        Object personFacilityIdObj = personData.get("facilityId");
+                        if (personFacilityIdObj != null) {
+                            Long personFacilityId = ((Number) personFacilityIdObj).longValue();
+                            if (!personFacilityId.equals(facilityId)) {
+                                throw new IllegalArgumentException(
+                                    "Upload failed: This file belongs to a different facility. " +
+                                    "Please ensure you are uploading the correct file for your assigned facility."
+                                );
+                            }
+                        }
+
+                        String hospitalNumber = (String) clientIntakeData.get("hospitalNumber");
+                        Long patientId = null;
+                        String patientUuid = null;
+                        boolean createNewPerson = true;
+
+                        // Check if hospital number already exists
+                        if (hospitalNumber != null && !hospitalNumber.trim().isEmpty()) {
+                            Optional<Person> existingPerson = personRepository.getPersonByHospitalNumberAndFacilityId(hospitalNumber, facilityId);
+                            if (existingPerson.isPresent()) {
+                                // Person already exists, skip person creation
+                                createNewPerson = false;
+                                patientId = existingPerson.get().getId();
+                                patientUuid = existingPerson.get().getUuid();
+                            }
+                        }
+
+                        // Create new person if hospital number doesn't exist
+                        if (createNewPerson) {
+                            PersonDto personDto = convertToPersonDto(personData);
+                            PersonResponseDto personResponseDto = personService.createPerson(personDto);
+
+                            if (personResponseDto != null) {
+                                patientId = personResponseDto.getId();
+                                patientUuid = String.valueOf(personResponseDto.getUuid());
+                            }
+                        }
+
+                        // Now process the rest of the forms
+                        if (patientId != null && patientUuid != null) {
+                            // Process Risk Stratification
+                            String riskStratificationCode = (String) riskStratificationData.get("code");
+                            Long riskStratificationId = null;
+                            boolean createNewRiskStratification = true;
+
+                            // Check if risk stratification code already exists
+                            if (riskStratificationCode != null && !riskStratificationCode.trim().isEmpty()) {
+                                Optional<org.lamisplus.modules.hts.domain.entity.RiskStratification> existingRiskStratification =
+                                    riskStratificationRepository.findByCode(riskStratificationCode);
+                                if (existingRiskStratification.isPresent()) {
+                                    createNewRiskStratification = false;
+                                    riskStratificationCode = existingRiskStratification.get().getCode();
+                                }
+                            }
+
+                            // Create new risk stratification if code doesn't exist
+                            if (createNewRiskStratification) {
+                                RiskStratificationDto riskStratificationDto = createRiskStratification(riskStratificationData);
+                                riskStratificationDto.setPersonId(patientId);
+
+                                Person person = personRepository.findById(patientId)
+                                        .orElseThrow(() -> new IllegalArgumentException("Person not found with ID: "));
+
+                                if (person.getUuid() == null || person.getUuid().isEmpty()) {
+                                    String generatedUuid = UUID.randomUUID().toString();
+                                    person.setUuid(generatedUuid);
+                                    personRepository.save(person);
+                                    patientUuid = generatedUuid;
+                                }
+
+                                RiskStratificationResponseDto riskStratificationResponseDto = riskStratificationService.save(riskStratificationDto);
+                                if (riskStratificationResponseDto != null && riskStratificationResponseDto.getCode() != null) {
+                                    riskStratificationCode = riskStratificationResponseDto.getCode();
+                                }
+                            }
+
+                            // Process Client Intake
+                            Long clientId = null;
+                            boolean createNewHtsClient = true;
+
+                            // Check if client intake with risk stratification code already exists
+                            if (riskStratificationCode != null && !riskStratificationCode.trim().isEmpty()) {
+                                Optional<HtsClient> existingHtsClient =
+                                    htsClientRepository.findFirstByRiskStratificationCode(riskStratificationCode);
+                                if (existingHtsClient.isPresent()) {
+                                    createNewHtsClient = false;
+                                    clientId = existingHtsClient.get().getId();
+                                }
+                            }
+
+                            // Create new HTS client if it doesn't exist
+                            if (createNewHtsClient && riskStratificationCode != null) {
+                                PersonDto personDto = convertToPersonDto(personData);
+                                HtsClientRequestDto htsClientRequestDto = createHtsClientRequestDto(
+                                    new PersonResponseDto(), clientIntakeData, patientId, riskStratificationCode);
+                                htsClientRequestDto.setPersonId(patientId);
+                                htsClientRequestDto.setPersonDto(personDto);
+
+                                HtsClientDto htsClientDto = htsClientService.save(htsClientRequestDto);
+                                if (htsClientDto != null) {
+                                    clientId = htsClientDto.getId();
+                                }
+                            }
+
+                            // Update Pre-Test form if clientId exists and data is not null
+                            if (clientId != null && preTestField != null) {
+                                HtsPreTestCounselingDto preTestDto = createPreTestCounseling(preTestData, clientId, patientId);
+                                htsClientService.updatePreTestCounseling(clientId, preTestDto);
+                            }
+
+                            // Update RequestResult form if clientId exists and data is not null
+                            if (clientId != null && requestResultField != null) {
+                                HtsRequestResultDto requestResultDto = createRequestResult(requestResultData, clientId, patientId);
+                                htsClientService.updateRequestResult(clientId, requestResultDto);
+                            }
+
+                            // Update Post-Test form if clientId exists and data is not null
+                            if (clientId != null && postTestField != null) {
+                                PostTestCounselingDto postTestDto = createPostTestCounseling(postTestData, clientId, patientId);
+                                htsClientService.updatePostTestCounselingKnowledgeAssessment(clientId, postTestDto);
+                            }
+
+                            // Update Recency form if clientId exists and data is not null
+                            if (clientId != null && recencyField != null) {
+                                HtsRecencyDto recencyDto = createRecency(recencyData, clientId, patientId);
+                                htsClientService.updateRecency(clientId, recencyDto);
+                            }
+
+                            // Check and save Family Index Testing if contactId doesn't exist
+                            if (clientId != null && familyIndexTestingField != null) {
+                                String contactId = (String) familyIndexTestingData.get("contactId");
+                                boolean shouldCreateFamilyIndex = true;
+
+                                if (contactId != null && !contactId.trim().isEmpty()) {
+                                    if (familyIndexTestingRepository.existsByContactId(contactId)) {
+                                        shouldCreateFamilyIndex = false;
+                                    }
+                                }
+
+                                if (shouldCreateFamilyIndex) {
+                                    // use the contact Id to get the HtsClient, by spliting "contactId": "PET/111125/1/00001/001", into  "contactId": "PET/111125/1/00001" and "/001", use this PET/111125/1/00001
+                                    HtsClientDto htsClientDto = htsClientService.getClientById(clientId);
+                                    String clientUuid = htsClientDto != null ? htsClientDto.getHtsClientUUid() : null;
+                                    if (clientUuid != null) {
+                                        FamilyIndexTestingRequestDTO dto = createFamilyIndexTesting(familyIndexTestingData, clientUuid, clientId);
+                                        familyIndexTestingService.save(dto);
+                                    }
+                                }
+                            }
+
+                            // Check and save Partner Notification Services if partnerId doesn't exist
+                            if (clientId != null && partnerNotificationServicesField != null) {
+                                String partnerIdStr = (String) partnerNotificationServicesData.get("partnerId");
+                                boolean shouldCreatePNS = true;
+
+                                if (partnerIdStr != null && !partnerIdStr.trim().isEmpty()) {
+                                    try {
+                                        Long partnerId = Long.parseLong(partnerIdStr);
+                                        if (partnerNotificationRepository.existsByPartnerId(partnerId)) {
+                                            shouldCreatePNS = false;
+                                        }
+                                    } catch (NumberFormatException e) {
+                                        // If partnerId is not a valid Long, proceed with creation
+                                    }
+                                }
+
+                                if (shouldCreatePNS) {
+                                    HtsClientDto htsClientDto =htsClientService.getClientById(clientId);
+                                    String clientUuid = htsClientDto != null ? htsClientDto.getHtsClientUUid() : null;
+                                    if (clientUuid != null) {
+                                        PersonalNotificationServiceRequestDTO dto = createPartnerNotificationServices(partnerNotificationServicesData, clientUuid, clientId);
+                                        pnsService.save(dto);
+                                    }
+                                }
+                            }
+
+                            // Check and save HTS Client Referral if it doesn't exist
+                            if (clientId != null && htsClientReferralField != null && patientUuid != null) {
+                                String nameOfContactPerson = (String) htsClientReferralData.get("nameOfContactPerson");
+                                String nameOfPersonReferringClient = (String) htsClientReferralData.get("nameOfPersonReferringClient");
+                                boolean shouldCreateReferral = true;
+
+                                if (hospitalNumber != null && !hospitalNumber.trim().isEmpty() &&
+                                    nameOfContactPerson != null && nameOfPersonReferringClient != null) {
+                                    if (clientReferralRepository.existsByHtsClientAndNameOfPersonReferringClientAndNameOfContactPerson(
+                                            patientUuid, nameOfPersonReferringClient, nameOfContactPerson)) {
+                                        shouldCreateReferral = false;
+                                    }
+                                }
+
+                                if (shouldCreateReferral) {
+                                    HtsClientDto htsClientDto = htsClientService.getClientById(clientId);
+                                    String clientUuid = htsClientDto != null ? htsClientDto.getHtsClientUUid() : null;
+                                    if (clientUuid != null) {
+                                        HtsClientReferralRequestDTO dto = createHtsClientReferral(htsClientReferralData, clientUuid, clientId);
+                                        clientReferralService.registerClientReferralForm(dto);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    recordsCount++;
+                }
+            }
+            getQuickSyncHistoryDTO(multipartFile, facility, fileSizeInMB, recordsCount, "HTS_UPDATE");
+        }
+
+        return resultList;
     }
 }
