@@ -1588,18 +1588,18 @@ public class QRReaderService {
                                 // 8. PROCESS FAMILY INDEX TESTING with try-catch
                                 if (clientId != null && familyIndexTestingField != null) {
                                     // Get contactId from nested familyIndexRequestDto object
-                                    String contactId = (String) familyIndexTestingData. get("contactId");
+//                                    String contactId = (String) familyIndexTestingData.get("contactId");
 
-//                                    String contactId = null;
-//                                    Object familyIndexRequestDtoObj = familyIndexTestingData.get("familyIndexRequestDto");
-//                                    if (familyIndexRequestDtoObj instanceof Map) {
-//                                        Map<String, Object> familyIndexRequestDto = (Map<String, Object>) familyIndexRequestDtoObj;
-//                                        contactId = (String) familyIndexRequestDto.get("contactId");
-//                                    }
+                                    String contactId = null;
+                                    Object familyIndexRequestDtoObj = familyIndexTestingData.get("familyIndexRequestDto");
+                                    if (familyIndexRequestDtoObj instanceof Map) {
+                                        Map<String, Object> familyIndexRequestDto = (Map<String, Object>) familyIndexRequestDtoObj;
+                                        contactId = (String) familyIndexRequestDto.get("contactId");
+                                    }
                                     boolean shouldCreateFamilyIndex = true;
 
                                     if (contactId != null && !contactId.trim().isEmpty()) {
-                                        if (familyIndexTestingRepository.existsByContactId(contactId)) {
+                                        if (familyIndexRepository.existsByContactId(contactId)) {
                                             shouldCreateFamilyIndex = false;
                                             recordResult.getSuccessfulComponents().add("familyIndexTesting (skipped - duplicate)");
                                             counters.put("familyIndexSkipped", counters.get("familyIndexSkipped") + 1);
@@ -1634,11 +1634,11 @@ public class QRReaderService {
                                 if (clientId != null && partnerNotificationServicesField != null) {
                                     String partnerIdStr = (String) partnerNotificationServicesData.get("partnerId");
                                     boolean shouldCreatePNS = true;
-
+                                    System.out.println("PNS PARTNER ID "+ partnerIdStr);
                                     if (partnerIdStr != null && !partnerIdStr.trim().isEmpty()) {
                                         try {
-                                            Long partnerId = Long.parseLong(partnerIdStr);
-                                            if (partnerNotificationRepository.existsByPartnerId(partnerId)) {
+//                                            String partnerId = Long.parseLong(partnerIdStr);
+                                            if (partnerNotificationRepository.existsByPartnerId(partnerIdStr)) {
                                                 shouldCreatePNS = false;
                                                 recordResult.getSuccessfulComponents().add("partnerNotificationServices (skipped - duplicate)");
                                                 counters.put("partnerNotificationSkipped", counters.get("partnerNotificationSkipped") + 1);
