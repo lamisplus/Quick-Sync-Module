@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
+import org.lamisplus.modules.sync.dto.BatchSyncResponse;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
 import org.lamisplus.modules.sync.service.QRReaderService;
 import org.springframework.http.HttpStatus;
@@ -83,6 +84,47 @@ public class QuickSyncController {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
 		} catch (IOException e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * HTS Batch Sync Endpoint with Component-Level Tracking
+	 *
+	 * This endpoint processes HTS records from a ZIP file and returns detailed tracking information
+	 * about which records succeeded, partially succeeded, or failed at the component level.
+	 *
+	 * @param facilityId The facility ID for the records being synced
+	 * @param file The ZIP file containing HTS records
+	 * @return BatchSyncResponse with summary and only problem records (failed/partial/skipped)
+	 */
+	@PostMapping("/import/hts-batch-sync")
+	public ResponseEntity<?> importHTSBatchSync(
+			@RequestParam("facilityId") Long facilityId,
+			@RequestParam("file") MultipartFile file) {
+		try {
+//			log.info("Starting HTS batch sync for facility: {} with file: {}", facilityId, file.getOriginalFilename());
+
+			BatchSyncResponse response = qrReaderService.processZipFileWithUpdateLogic(facilityId, file);
+
+//			log.info("HTS batch sync completed. Total: {}, Success: {}, Partial: {}, Failed: {}, Skipped: {}",
+//					response.getTotalRecords(),
+//					response.getCompletelySuccessful(),
+//					response.getPartiallySuccessful(),
+//					response.getCompletelyFailed(),
+//					response.getSkippedRecords());
+
+			return ResponseEntity.ok(response);
+		} catch (IllegalArgumentException e) {
+//			log.error("Validation error during HTS batch sync: {}", e.getMessage());
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+		} catch (IOException e) {
+//			log.error("IO error during HTS batch sync: {}", e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error processing ZIP file: " + e.getMessage());
+		} catch (Exception e) {
+//			log.error("Unexpected error during HTS batch sync", e);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("An unexpected error occurred: " + e.getMessage());
 		}
 	}
 
