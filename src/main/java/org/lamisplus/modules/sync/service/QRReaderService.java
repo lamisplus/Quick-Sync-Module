@@ -1293,6 +1293,15 @@ public class QRReaderService {
         counters.put("clientReferralCreated", 0);
         counters.put("clientReferralSkipped", 0);
         counters.put("clientReferralFailed", 0);
+        counters.put("ancCreated", 0);
+        counters.put("ancSkipped", 0);
+        counters.put("ancFailed", 0);
+        counters.put("childFollowupCreated", 0);
+        counters.put("childFollowupFailed", 0);
+        counters.put("motherFollowupCreated", 0);
+        counters.put("motherFollowupFailed", 0);
+        counters.put("partnerRegistrationCreated", 0);
+        counters.put("partnerRegistrationFailed", 0);
 
         int totalRecords = 0;
         int completelySuccessful = 0;
@@ -1340,6 +1349,10 @@ public class QRReaderService {
                         Object familyIndexTestingField = result.get("familyIndexTesting");
                         Object htsClientReferralField = result.get("htsClientReferral");
                         Object partnerNotificationServicesField = result.get("partnerNotificationServices");
+                        Object ancField = result.get("anc");
+                        Object childFollowupVisitField = result.get("childFollowupVisit");
+                        Object motherFollowupVisitField = result.get("motherFollowupVisit");
+                        Object partnerRegistrationField = result.get("partnerRegistration");
 
                         // Safely cast fields to their expected types
                         Map<String, Object> personData = (Map<String, Object>) personField;
@@ -1352,6 +1365,10 @@ public class QRReaderService {
                         Map<String, Object> familyIndexTestingData = (Map<String, Object>) familyIndexTestingField;
                         Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
                         Map<String, Object> partnerNotificationServicesData = (Map<String, Object>) partnerNotificationServicesField;
+                        Map<String, Object> ancData = (Map<String, Object>) ancField;
+                        Map<String, Object> childFollowupVisitData = (Map<String, Object>) childFollowupVisitField;
+                        Map<String, Object> motherFollowupVisitData = (Map<String, Object>) motherFollowupVisitField;
+                        Map<String, Object> partnerRegistrationData = (Map<String, Object>) partnerRegistrationField;
 
                         if (personField instanceof Map) {
                             // Validate that the person's facilityId matches the input facilityId
@@ -1712,6 +1729,104 @@ public class QRReaderService {
                                         counters.put("clientReferralFailed", counters.get("clientReferralFailed") + 1);
                                     }
                                 }
+
+                                // 11. PROCESS ANC with try-catch
+                                if (patientId != null && patientUuid != null && ancField != null) {
+                                    String ancNo = (String) ancData.get("ancNo");
+                                    boolean shouldCreateAnc = true;
+
+                                    try {
+                                        // Check for duplicate ANC using ancNo
+                                        if (ancNo != null && !ancNo.trim().isEmpty()) {
+                                            Optional<ANC> existingAnc = ancRepository.getByAncNo(ancNo);
+                                            if (existingAnc.isPresent()) {
+                                                shouldCreateAnc = false;
+                                                recordResult.getSuccessfulComponents().add("anc (skipped - duplicate)");
+                                                counters.put("ancSkipped", counters.get("ancSkipped") + 1);
+                                            }
+                                        }
+
+                                        if (shouldCreateAnc) {
+                                            PersonDto personDto = convertToPersonDto(personData);
+                                            ANCEnrollementRequestDto dto = createAnc(ancData, patientUuid, patientId, personDto);
+                                            ancService.ANCEnrollement(dto);
+                                            recordResult.getSuccessfulComponents().add("anc");
+                                            counters.put("ancCreated", counters.get("ancCreated") + 1);
+                                        }
+                                    } catch (Exception e) {
+                                        recordResult.getFailedComponents().add(
+                                                SyncRecordResult.ComponentFailure.builder()
+                                                        .component("anc")
+                                                        .identifier(ancNo)
+                                                        .reason(e.getMessage())
+                                                        .errorCode("DATABASE_ERROR")
+                                                        .build()
+                                        );
+                                        counters.put("ancFailed", counters.get("ancFailed") + 1);
+                                    }
+                                }
+
+                                // 12. PROCESS CHILD FOLLOWUP VISIT with try-catch
+                                if (childFollowupVisitField != null) {
+                                    try {
+                                        InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
+                                        infantVisitService.saveConsolidation(dto, dto.getInfantRapidAntiBodyTestDto());
+                                        recordResult.getSuccessfulComponents().add("childFollowupVisit");
+                                        counters.put("childFollowupCreated", counters.get("childFollowupCreated") + 1);
+                                    } catch (Exception e) {
+                                        recordResult.getFailedComponents().add(
+                                                SyncRecordResult.ComponentFailure.builder()
+                                                        .component("childFollowupVisit")
+                                                        .identifier(hospitalNumber)
+                                                        .reason(e.getMessage())
+                                                        .errorCode("DATABASE_ERROR")
+                                                        .build()
+                                        );
+                                        counters.put("childFollowupFailed", counters.get("childFollowupFailed") + 1);
+                                    }
+                                }
+
+                                // 13. PROCESS MOTHER FOLLOWUP VISIT with try-catch
+                                if (motherFollowupVisitField != null) {
+                                    try {
+                                        pmtctVisitService.save(objectMapper.convertValue(motherFollowupVisitData, PmtctVisitRequestDto.class));
+                                        recordResult.getSuccessfulComponents().add("motherFollowupVisit");
+                                        counters.put("motherFollowupCreated", counters.get("motherFollowupCreated") + 1);
+                                    } catch (Exception e) {
+                                        recordResult.getFailedComponents().add(
+                                                SyncRecordResult.ComponentFailure.builder()
+                                                        .component("motherFollowupVisit")
+                                                        .identifier(hospitalNumber)
+                                                        .reason(e.getMessage())
+                                                        .errorCode("DATABASE_ERROR")
+                                                        .build()
+                                        );
+                                        counters.put("motherFollowupFailed", counters.get("motherFollowupFailed") + 1);
+                                    }
+                                }
+
+                                // 14. PROCESS PARTNER REGISTRATION with try-catch
+                                if (patientUuid != null && partnerRegistrationField != null) {
+                                    try {
+                                        PartnerInformation dto = createPartnerInformation(partnerRegistrationData);
+                                        Optional<ANC> anc = ancRepository.findANCByPersonUuid(patientUuid);
+                                        if (anc.isPresent()) {
+                                            ancService.updateAncWithPartnerInfo(anc.get().getId(), dto);
+                                            recordResult.getSuccessfulComponents().add("partnerRegistration");
+                                            counters.put("partnerRegistrationCreated", counters.get("partnerRegistrationCreated") + 1);
+                                        }
+                                    } catch (Exception e) {
+                                        recordResult.getFailedComponents().add(
+                                                SyncRecordResult.ComponentFailure.builder()
+                                                        .component("partnerRegistration")
+                                                        .identifier(hospitalNumber)
+                                                        .reason(e.getMessage())
+                                                        .errorCode("DATABASE_ERROR")
+                                                        .build()
+                                        );
+                                        counters.put("partnerRegistrationFailed", counters.get("partnerRegistrationFailed") + 1);
+                                    }
+                                }
                             }
 
                             // Determine overall status for this record
@@ -1767,6 +1882,15 @@ public class QRReaderService {
                 .clientReferralCreated(counters.get("clientReferralCreated"))
                 .clientReferralSkipped(counters.get("clientReferralSkipped"))
                 .clientReferralFailed(counters.get("clientReferralFailed"))
+                .ancCreated(counters.get("ancCreated"))
+                .ancSkipped(counters.get("ancSkipped"))
+                .ancFailed(counters.get("ancFailed"))
+                .childFollowupCreated(counters.get("childFollowupCreated"))
+                .childFollowupFailed(counters.get("childFollowupFailed"))
+                .motherFollowupCreated(counters.get("motherFollowupCreated"))
+                .motherFollowupFailed(counters.get("motherFollowupFailed"))
+                .partnerRegistrationCreated(counters.get("partnerRegistrationCreated"))
+                .partnerRegistrationFailed(counters.get("partnerRegistrationFailed"))
                 .build();
 
         // Collect only problem records (not completely successful)

@@ -38,4 +38,18 @@ public class SyncSummaryByType {
     private Integer clientReferralCreated;
     private Integer clientReferralSkipped; // Duplicates
     private Integer clientReferralFailed;
+
+    // PMTCT Forms
+    private Integer ancCreated;
+    private Integer ancSkipped; // Duplicates
+    private Integer ancFailed;
+
+    private Integer childFollowupCreated;
+    private Integer childFollowupFailed;
+
+    private Integer motherFollowupCreated;
+    private Integer motherFollowupFailed;
+
+    private Integer partnerRegistrationCreated;
+    private Integer partnerRegistrationFailed;
 }
