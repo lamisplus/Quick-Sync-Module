@@ -29,5 +29,8 @@ public class BatchSyncResponse {
     @Builder.Default
     private List<SyncRecordResult> problemRecords = new ArrayList<>(); // Only failed/partial/skipped records
 
-    private Long processingTimeMs; // For performance monitoring
+    @Builder.Default
+    private List<SyncRecordResult> successfulRecords = new ArrayList<>(); // Completely successful records with hospitalNumber and riskStratificationCode
+
+    private Long processingTimeMs;
 }

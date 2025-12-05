@@ -1898,6 +1898,11 @@ public class QRReaderService {
                 .filter(record -> !record.getStatus().equals("COMPLETELY_SUCCESSFUL"))
                 .collect(Collectors.toList());
 
+        // Collect completely successful records
+        List<SyncRecordResult> successfulRecords = recordResults.values().stream()
+                .filter(record -> record.getStatus().equals("COMPLETELY_SUCCESSFUL"))
+                .collect(Collectors.toList());
+
         // Build and return response
         long processingTime = System.currentTimeMillis() - startTime;
 
@@ -1912,6 +1917,7 @@ public class QRReaderService {
                 .skippedRecords(skippedRecords)
                 .summary(summary)
                 .problemRecords(problemRecords)
+                .successfulRecords(successfulRecords)
                 .processingTimeMs(processingTime)
                 .build();
     }
