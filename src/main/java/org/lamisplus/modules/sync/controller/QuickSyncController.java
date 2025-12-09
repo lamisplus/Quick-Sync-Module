@@ -102,27 +102,15 @@ public class QuickSyncController {
 			@RequestParam("facilityId") Long facilityId,
 			@RequestParam("file") MultipartFile file) {
 		try {
-//			log.info("Starting HTS batch sync for facility: {} with file: {}", facilityId, file.getOriginalFilename());
 
 			BatchSyncResponse response = qrReaderService.processZipFileWithUpdateLogic(facilityId, file);
-
-//			log.info("HTS batch sync completed. Total: {}, Success: {}, Partial: {}, Failed: {}, Skipped: {}",
-//					response.getTotalRecords(),
-//					response.getCompletelySuccessful(),
-//					response.getPartiallySuccessful(),
-//					response.getCompletelyFailed(),
-//					response.getSkippedRecords());
-
 			return ResponseEntity.ok(response);
 		} catch (IllegalArgumentException e) {
-//			log.error("Validation error during HTS batch sync: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
 		} catch (IOException e) {
-//			log.error("IO error during HTS batch sync: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error processing ZIP file: " + e.getMessage());
 		} catch (Exception e) {
-//			log.error("Unexpected error during HTS batch sync", e);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("An unexpected error occurred: " + e.getMessage());
 		}

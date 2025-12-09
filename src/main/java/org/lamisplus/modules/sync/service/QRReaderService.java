@@ -73,6 +73,7 @@ public class QRReaderService {
 //    private final RegimenRepository regimenRepository;
 
     private final ObjectMapper objectMapper;
+    private final BatchSyncLogService batchSyncLogService;
 
     private String decompressAndDecode(String base64CompressedData) throws IOException {
         // Remove any spaces or newlines from the base64 encoded string
@@ -1302,6 +1303,8 @@ public class QRReaderService {
         counters.put("motherFollowupFailed", 0);
         counters.put("partnerRegistrationCreated", 0);
         counters.put("partnerRegistrationFailed", 0);
+        counters.put("infantRegistrationCreated", 0);
+        counters.put("infantRegistrationFailed", 0);
 
         int totalRecords = 0;
         int completelySuccessful = 0;
@@ -1353,6 +1356,7 @@ public class QRReaderService {
                         Object childFollowupVisitField = result.get("childFollowupVisit");
                         Object motherFollowupVisitField = result.get("motherFollowupVisit");
                         Object partnerRegistrationField = result.get("partnerRegistration");
+                        Object infantRegistrationField = result.get("infantRegistration");
 
                         // Safely cast fields to their expected types
                         Map<String, Object> personData = (Map<String, Object>) personField;
@@ -1369,6 +1373,7 @@ public class QRReaderService {
                         Map<String, Object> childFollowupVisitData = (Map<String, Object>) childFollowupVisitField;
                         Map<String, Object> motherFollowupVisitData = (Map<String, Object>) motherFollowupVisitField;
                         Map<String, Object> partnerRegistrationData = (Map<String, Object>) partnerRegistrationField;
+                        Map<String, Object> infantRegistrationData = (Map<String, Object>) infantRegistrationField;
 
                         if (personField instanceof Map) {
                             // Validate that the person's facilityId matches the input facilityId
@@ -1787,9 +1792,10 @@ public class QRReaderService {
                                 }
 
                                 // 13. PROCESS MOTHER FOLLOWUP VISIT with try-catch
-                                if (motherFollowupVisitField != null) {
+                                if (motherFollowupVisitField != null)   {
                                     try {
-                                        pmtctVisitService.save(objectMapper.convertValue(motherFollowupVisitData, PmtctVisitRequestDto.class));
+                                        PmtctVisitRequestDto pmtctVisitDto = createPmtctVisitRequestDto(motherFollowupVisitData);
+                                        pmtctVisitService.save(pmtctVisitDto);
                                         recordResult.getSuccessfulComponents().add("motherFollowupVisit");
                                         counters.put("motherFollowupCreated", counters.get("motherFollowupCreated") + 1);
                                     } catch (Exception e) {
@@ -1826,6 +1832,26 @@ public class QRReaderService {
                                         );
                                         counters.put("partnerRegistrationFailed", counters.get("partnerRegistrationFailed") + 1);
                                     }
+                                }
+                            }
+
+                            // 15. PROCESS INFANT REGISTRATION with try-catch
+                            if (patientUuid != null && infantRegistrationField != null) {
+                                try {
+                                    InfantDto dto = createInfantDto(infantRegistrationData, patientUuid);
+                                    infantService.save(dto);
+                                    recordResult.getSuccessfulComponents().add("infantRegistration");
+                                    counters.put("infantRegistrationCreated", counters.get("infantRegistrationCreated") + 1);
+                                } catch (Exception e) {
+                                    recordResult.getFailedComponents().add(
+                                            SyncRecordResult.ComponentFailure.builder()
+                                                    .component("infantRegistration")
+                                                    .identifier(hospitalNumber)
+                                                    .reason(e.getMessage())
+                                                    .errorCode("DATABASE_ERROR")
+                                                    .build()
+                                    );
+                                    counters.put("infantRegistrationFailed", counters.get("infantRegistrationFailed") + 1);
                                 }
                             }
 
@@ -1891,6 +1917,8 @@ public class QRReaderService {
                 .motherFollowupFailed(counters.get("motherFollowupFailed"))
                 .partnerRegistrationCreated(counters.get("partnerRegistrationCreated"))
                 .partnerRegistrationFailed(counters.get("partnerRegistrationFailed"))
+                .infantRegistrationCreated(counters.get("infantRegistrationCreated"))
+                .infantRegistrationFailed(counters.get("infantRegistrationFailed"))
                 .build();
 
         // Collect only problem records (not completely successful)
@@ -1906,7 +1934,7 @@ public class QRReaderService {
         // Build and return response
         long processingTime = System.currentTimeMillis() - startTime;
 
-        return BatchSyncResponse.builder()
+        BatchSyncResponse response = BatchSyncResponse.builder()
                 .fileName(fileName)
                 .facilityName(facility.getName())
                 .processedAt(LocalDateTime.now())
@@ -1920,6 +1948,19 @@ public class QRReaderService {
                 .successfulRecords(successfulRecords)
                 .processingTimeMs(processingTime)
                 .build();
+
+        // Log the batch sync response to JSON file
+        try {
+            String logFilePath = batchSyncLogService.logBatchSyncResponse(response, facilityId, null);
+            if (logFilePath != null) {
+                System.out.println("Batch sync log saved to: " + logFilePath);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the sync process
+            System.err.println("Failed to log batch sync response: " + e.getMessage());
+        }
+
+        return response;
     }
 
 }

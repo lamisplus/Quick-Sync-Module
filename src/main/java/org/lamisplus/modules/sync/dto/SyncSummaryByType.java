@@ -52,4 +52,7 @@ public class SyncSummaryByType {
 
     private Integer partnerRegistrationCreated;
     private Integer partnerRegistrationFailed;
+
+    private Integer infantRegistrationCreated;
+    private Integer infantRegistrationFailed;
 }

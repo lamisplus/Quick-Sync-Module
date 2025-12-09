@@ -258,7 +258,7 @@ const DatabaseRestore = props => {
       } else if (fileName.toLowerCase().includes("lamisplus-export") === true) {
         axios
           .post(
-            `${baseUrl}quick-sync/upload-client-zip?facilityId=${upload.facilityId}`,
+            `${baseUrl}quick-sync/import/hts-batch-sync?facilityId=${upload.facilityId}`,
             formData,
             {
               headers: { Authorization: `Bearer ${token}` },
@@ -267,7 +267,16 @@ const DatabaseRestore = props => {
           .then(response => {
             setLoading(false);
             syncHistory();
-            toast.success("HTS sync successfully");
+
+            // Display detailed sync results
+            const data = response.data;
+            const successMsg = `lamisplus-export sync completed! Total: ${data.totalRecords}, Success: ${data.completelySuccessful}, Partial: ${data.partiallySuccessful}, Failed: ${data.completelyFailed}`;
+            toast.success(successMsg);
+
+            // Log problem records if any
+            if (data.problemRecords && data.problemRecords.length > 0) {
+              console.log("Problem Records:", data.problemRecords);
+            }
           })
           .catch(error => {
             setLoading(false);
