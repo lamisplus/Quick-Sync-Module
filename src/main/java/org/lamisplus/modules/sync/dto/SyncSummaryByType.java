@@ -44,6 +44,10 @@ public class SyncSummaryByType {
     private Integer ancSkipped; // Duplicates
     private Integer ancFailed;
 
+    private Integer pmtctEnrollmentCreated;
+    private Integer pmtctEnrollmentSkipped; // Skipped when parent ANC exists
+    private Integer pmtctEnrollmentFailed;
+
     private Integer childFollowupCreated;
     private Integer childFollowupFailed;
 
