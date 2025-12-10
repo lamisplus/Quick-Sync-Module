@@ -255,7 +255,7 @@ public class QRReaderService {
                                             ancService.ANCEnrollement(dto);
                                     }
                                     if (childFollowupVisitField != null) {
-                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
+                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData, patientUuid);
                                             infantVisitService.saveConsolidation(dto,dto.getInfantRapidAntiBodyTestDto());
                                     }
                                     if (motherFollowupVisitField != null) {
@@ -1125,7 +1125,7 @@ public class QRReaderService {
         }
     }
 
-    private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data) {
+    private InfantVisitationConsolidatedDto createChildFollowup(Map<String, Object> data, String motherPersonUuid) {
         InfantVisitationConsolidatedDto dto = new InfantVisitationConsolidatedDto();
         Map<String, Object> infantMotherArtData = (Map<String, Object>) data.get("infantMotherArtDto");
 //        if (infantMotherArtData != null) {
@@ -1144,14 +1144,41 @@ public class QRReaderService {
 //                }
 //            }
 //        }
-        dto.setInfantVisitRequestDto(objectMapper.convertValue(data.get("infantVisitRequestDto"), InfantVisitRequestDto.class));
-        dto.setInfantMotherArtDto(objectMapper.convertValue(infantMotherArtData, InfantMotherArtDto.class));
-        dto.setInfantArvDto(objectMapper.convertValue(data.get("infantArvDto"), InfantArvDto.class));
-        dto.setInfantPCRTestDto(objectMapper.convertValue(data.get("infantPCRTestDto"), InfantPCRTestDto.class));
-        dto.setInfantRapidAntiBodyTestDto(objectMapper.convertValue(data.get("infantRapidAntiBodyTestDto"), InfantRapidAntiBodyTestDto.class));
+
+        // Convert all DTOs
+        InfantVisitRequestDto infantVisitDto = objectMapper.convertValue(data.get("infantVisitRequestDto"), InfantVisitRequestDto.class);
+        InfantMotherArtDto infantMotherArtDto = objectMapper.convertValue(infantMotherArtData, InfantMotherArtDto.class);
+        InfantArvDto infantArvDto = objectMapper.convertValue(data.get("infantArvDto"), InfantArvDto.class);
+        InfantPCRTestDto infantPCRTestDto = objectMapper.convertValue(data.get("infantPCRTestDto"), InfantPCRTestDto.class);
+        InfantRapidAntiBodyTestDto infantRapidAntiBodyTestDto = objectMapper.convertValue(data.get("infantRapidAntiBodyTestDto"), InfantRapidAntiBodyTestDto.class);
+
+        // Set motherPersonUuid in all DTOs
+        if (motherPersonUuid != null) {
+            if (infantVisitDto != null) {
+                infantVisitDto.setPersonUuid(motherPersonUuid);
+            }
+            if (infantMotherArtDto != null) {
+                infantMotherArtDto.setMotherPersonUuid(motherPersonUuid);
+            }
+            if (infantArvDto != null) {
+                infantArvDto.setMotherPersonUuid(motherPersonUuid);
+            }
+            if (infantPCRTestDto != null) {
+                infantPCRTestDto.setMotherPersonUuid(motherPersonUuid);
+            }
+            if (infantRapidAntiBodyTestDto != null) {
+                infantRapidAntiBodyTestDto.setMotherPersonUuid(motherPersonUuid);
+            }
+        }
+
+        dto.setInfantVisitRequestDto(infantVisitDto);
+        dto.setInfantMotherArtDto(infantMotherArtDto);
+        dto.setInfantArvDto(infantArvDto);
+        dto.setInfantPCRTestDto(infantPCRTestDto);
+        dto.setInfantRapidAntiBodyTestDto(infantRapidAntiBodyTestDto);
         return dto;
     }
-    private PmtctVisitRequestDto createPmtctVisitRequestDto(Map<String, Object> visitData) {
+    private PmtctVisitRequestDto createPmtctVisitRequestDto(Map<String, Object> visitData, String patientUuid, String hospitalNumber, Long facilityId) {
         return PmtctVisitRequestDto.builder()
                 .id(convertToLong(visitData.get("id")))
                 .ancNo((String) visitData.get("ancNo"))
@@ -1173,7 +1200,9 @@ public class QRReaderService {
                 .visitStatus((String) visitData.get("visitStatus"))
                 .transferTo((String) visitData.get("transferTo"))
                 .nextAppointmentDate(parseDate(visitData.get("nextAppointmentDate")))
-                .personUuid((String) visitData.get("personUuid"))
+                .personUuid(patientUuid)
+//                .hospitalNumber(hospitalNumber)  // Set from person's hospital number
+//                .facilityId(facilityId)  // Set from person's facility ID
                 .build();
     }
     public InfantRapidAntiBodyTestDto createInfantRapidAntibodyTest(Map<String, Object>  data) {
@@ -1306,6 +1335,9 @@ public class QRReaderService {
         counters.put("pmtctEnrollmentCreated", 0);
         counters.put("pmtctEnrollmentSkipped", 0);
         counters.put("pmtctEnrollmentFailed", 0);
+        counters.put("labourDeliveryCreated", 0);
+        counters.put("labourDeliverySkipped", 0);
+        counters.put("labourDeliveryFailed", 0);
         counters.put("ancCreated", 0);
         counters.put("ancSkipped", 0);
         counters.put("ancFailed", 0);
@@ -1369,6 +1401,7 @@ public class QRReaderService {
                         Object htsClientReferralField = result.get("htsClientReferral");
                         Object partnerNotificationServicesField = result.get("partnerNotificationServices");
                         Object pmtctEnrollmentField = result.get("pmtctEnrollment");
+                        Object labourDeliveryField = result.get("labourDelivery");
                         Object ancField = result.get("anc");
                         Object childFollowupVisitField = result.get("childFollowupVisit");
                         Object motherFollowupVisitField = result.get("motherFollowupVisit");
@@ -1387,6 +1420,7 @@ public class QRReaderService {
                         Map<String, Object> htsClientReferralData = (Map<String, Object>) htsClientReferralField;
                         Map<String, Object> partnerNotificationServicesData = (Map<String, Object>) partnerNotificationServicesField;
                         Map<String, Object> pmtctEnrollmentData = (Map<String, Object>) pmtctEnrollmentField;
+                        Map<String, Object> labourDeliveryData = (Map<String, Object>) labourDeliveryField;
                         Map<String, Object> ancData = (Map<String, Object>) ancField;
                         Map<String, Object> childFollowupVisitData = (Map<String, Object>) childFollowupVisitField;
                         Map<String, Object> motherFollowupVisitData = (Map<String, Object>) motherFollowupVisitField;
@@ -1776,6 +1810,10 @@ public class QRReaderService {
                                                     recordResult.getSuccessfulComponents().add("pmtctEnrollment (skipped - parent ANC exists)");
                                                     counters.put("pmtctEnrollmentSkipped", counters.getOrDefault("pmtctEnrollmentSkipped", 0) + 1);
                                                 }
+                                                if (labourDeliveryField != null) {
+                                                    recordResult.getSuccessfulComponents().add("labourDelivery (skipped - parent ANC exists)");
+                                                    counters.put("labourDeliverySkipped", counters.getOrDefault("labourDeliverySkipped", 0) + 1);
+                                                }
                                                 if (childFollowupVisitField != null) {
                                                     recordResult.getSuccessfulComponents().add("childFollowupVisit (skipped - parent ANC exists)");
                                                     counters.put("childFollowupSkipped", counters.getOrDefault("childFollowupSkipped", 0) + 1);
@@ -1824,11 +1862,12 @@ public class QRReaderService {
                                     }
 
                                     // 11b. PROCESS PMTCT ENROLLMENT with try-catch (child of ANC)
+                                    boolean enrollmentSaved = false;
                                     if (patientUuid != null && pmtctEnrollmentField != null) {
                                         try {
                                             PersonDto personDto = convertToPersonDto(personData);
                                             PMTCTEnrollmentRequestDto dto = createPmtctEnrollmentDto(pmtctEnrollmentData, personDto, patientUuid);
-                                            pmtctService.save(dto);
+                                            enrollmentSaved = pmtctService.save(dto).isPmtctRegStatus();
                                             recordResult.getSuccessfulComponents().add("pmtctEnrollment");
                                             counters.put("pmtctEnrollmentCreated", counters.get("pmtctEnrollmentCreated") + 1);
                                         } catch (Exception e) {
@@ -1844,10 +1883,34 @@ public class QRReaderService {
                                         }
                                     }
 
+                                    // 11c. PROCESS LABOUR DELIVERY with try-catch (only if pmtctEnrollment saved successfully)
+                                    if (enrollmentSaved && labourDeliveryField != null) {
+                                        try {
+                                            DeliveryRequestDto ldto = createDeliveryRequestDto(labourDeliveryData, patientUuid);
+                                            deliveryService.save(ldto);
+                                            recordResult.getSuccessfulComponents().add("labourDelivery");
+                                            counters.put("labourDeliveryCreated", counters.get("labourDeliveryCreated") + 1);
+                                        } catch (Exception e) {
+                                            recordResult.getFailedComponents().add(
+                                                    SyncRecordResult.ComponentFailure.builder()
+                                                            .component("labourDelivery")
+                                                            .identifier(hospitalNumber)
+                                                            .reason(e.getMessage())
+                                                            .errorCode("DATABASE_ERROR")
+                                                            .build()
+                                            );
+                                            counters.put("labourDeliveryFailed", counters.get("labourDeliveryFailed") + 1);
+                                        }
+                                    } else if (!enrollmentSaved && labourDeliveryField != null) {
+                                        // If pmtctEnrollment was not saved but labourDelivery exists, mark it as skipped
+                                        recordResult.getSuccessfulComponents().add("labourDelivery (skipped - pmtctEnrollment not saved)");
+                                        counters.put("labourDeliverySkipped", counters.get("labourDeliverySkipped") + 1);
+                                    }
+
                                     // 12. PROCESS CHILD FOLLOWUP VISIT with try-catch
                                     if (childFollowupVisitField != null) {
                                         try {
-                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData);
+                                            InfantVisitationConsolidatedDto dto = createChildFollowup(childFollowupVisitData, patientUuid);
                                             infantVisitService.saveConsolidation(dto, dto.getInfantRapidAntiBodyTestDto());
                                             recordResult.getSuccessfulComponents().add("childFollowupVisit");
                                             counters.put("childFollowupCreated", counters.get("childFollowupCreated") + 1);
@@ -1867,7 +1930,8 @@ public class QRReaderService {
                                     // 13. PROCESS MOTHER FOLLOWUP VISIT with try-catch
                                     if (motherFollowupVisitField != null)   {
                                         try {
-                                            PmtctVisitRequestDto pmtctVisitDto = createPmtctVisitRequestDto(motherFollowupVisitData);
+                                            Long personFacilityId = ((Number) personData.get("facilityId")).longValue();
+                                            PmtctVisitRequestDto pmtctVisitDto = createPmtctVisitRequestDto(motherFollowupVisitData, patientUuid, hospitalNumber, personFacilityId);
                                             pmtctVisitService.save(pmtctVisitDto);
                                             recordResult.getSuccessfulComponents().add("motherFollowupVisit");
                                             counters.put("motherFollowupCreated", counters.get("motherFollowupCreated") + 1);
@@ -1988,6 +2052,9 @@ public class QRReaderService {
                 .pmtctEnrollmentCreated(counters.get("pmtctEnrollmentCreated"))
                 .pmtctEnrollmentSkipped(counters.get("pmtctEnrollmentSkipped"))
                 .pmtctEnrollmentFailed(counters.get("pmtctEnrollmentFailed"))
+                .labourDeliveryCreated(counters.get("labourDeliveryCreated"))
+                .labourDeliverySkipped(counters.get("labourDeliverySkipped"))
+                .labourDeliveryFailed(counters.get("labourDeliveryFailed"))
                 .childFollowupCreated(counters.get("childFollowupCreated"))
                 .childFollowupFailed(counters.get("childFollowupFailed"))
                 .motherFollowupCreated(counters.get("motherFollowupCreated"))

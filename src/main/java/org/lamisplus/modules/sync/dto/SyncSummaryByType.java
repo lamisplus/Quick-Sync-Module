@@ -48,6 +48,10 @@ public class SyncSummaryByType {
     private Integer pmtctEnrollmentSkipped; // Skipped when parent ANC exists
     private Integer pmtctEnrollmentFailed;
 
+    private Integer labourDeliveryCreated;
+    private Integer labourDeliverySkipped; // Skipped when parent ANC exists or pmtctEnrollment not saved
+    private Integer labourDeliveryFailed;
+
     private Integer childFollowupCreated;
     private Integer childFollowupFailed;
 
