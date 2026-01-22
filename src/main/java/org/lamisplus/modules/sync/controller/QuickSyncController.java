@@ -87,16 +87,7 @@ public class QuickSyncController {
 		}
 	}
 
-	/**
-	 * HTS Batch Sync Endpoint with Component-Level Tracking
-	 *
-	 * This endpoint processes HTS records from a ZIP file and returns detailed tracking information
-	 * about which records succeeded, partially succeeded, or failed at the component level.
-	 *
-	 * @param facilityId The facility ID for the records being synced
-	 * @param file The ZIP file containing HTS records
-	 * @return BatchSyncResponse with summary and only problem records (failed/partial/skipped)
-	 */
+
 	@PostMapping("/import/hts-batch-sync")
 	public ResponseEntity<?> importHTSBatchSync(
 			@RequestParam("facilityId") Long facilityId,
