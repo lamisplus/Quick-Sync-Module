@@ -22,4 +22,19 @@
                 );
         </sql>
     </changeSet>
+
+    <changeSet failOnError="true" author="Gamaliel" id="2025-09-29-01">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="quick_sync_history"/>
+                <not>
+                    <columnExists tableName="quick_sync_history" columnName="records_count"/>
+                </not>
+            </and>
+        </preConditions>
+        <sql>
+            ALTER TABLE quick_sync_history ADD COLUMN records_count int;
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>

@@ -14,8 +14,11 @@ import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
+import org.lamisplus.modules.base.domain.entities.User;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
+import org.lamisplus.modules.base.service.UserService;
 import org.lamisplus.modules.biometric.domain.Biometric;
+import org.lamisplus.modules.biometric.services.BiometricService;
 import org.lamisplus.modules.sync.domain.dto.BiometricMetaDataDTO;
 import org.lamisplus.modules.biometric.repository.BiometricRepository;
 import org.lamisplus.modules.patient.domain.entity.Person;
@@ -70,7 +73,9 @@ public class PersonQuickSyncService {
 
 	private final BiometricDTOToBiometricMapper biometricMapper;
 
+	private final BiometricService biometricService;
 	private final ObjectMapper objectMapper = new ObjectMapper();
+	private final UserService userService;
 
 
 
@@ -85,16 +90,13 @@ public class PersonQuickSyncService {
 				.collect(Collectors.toSet());
 	}
 	public List<BiometricDTO> getBiometricDTO(Long facilityId, LocalDate start, LocalDate end) {
-		// not best practice
-		List<BiometricDTO> data = new ArrayList<BiometricDTO>();
+ 		List<BiometricDTO> data = new ArrayList<BiometricDTO>();
 		try {
-			LOG.info("start fetching biometric details... start {} and end {}", start, end);
 			List<Biometric> biometricRows1 = biometricRepository.findAll().stream()
 					.filter(Objects::nonNull)
 					.filter(biometric -> isPersonCreatedWithinDateRange(start, end, biometric.getCreatedDate()))
 					.collect(Collectors.toList());
-			LOG.info("biometric list {}", biometricRows1.size());
-			
+
 			List<BiometricMetaDataDTO> biometricRows = biometricRows1
 					.stream()
 					.filter(biometric -> biometric.getFacilityId() != null
@@ -103,7 +105,6 @@ public class PersonQuickSyncService {
 					)
 					.map(biometricDTOMapper)
 					.collect(Collectors.toList());
-			LOG.info("biometricRows:{}", biometricRows.size());
 			Set<String> persons = biometricRows
 					.stream()
 					.map(BiometricMetaDataDTO::getPersonUuid).collect(Collectors.toSet());
@@ -152,6 +153,13 @@ public class PersonQuickSyncService {
 	}
 	
 	public QuickSyncHistoryDTO importPersonData(Long facilityId, MultipartFile file) throws IOException {
+		// Check if the file has already been uploaded
+		String fileName = file.getOriginalFilename();
+		Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
+		if(fileExists){
+			throw new IllegalArgumentException("This file has already been uploaded and processed. Please upload a different file.");
+		}
+
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.findAndRegisterModules();
 		configureMapperToHandleDate(mapper);
@@ -160,6 +168,7 @@ public class PersonQuickSyncService {
 		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
 		List<PersonDTO> personDTOS = mapper.readValue(data, new TypeReference<List<PersonDTO>>() {
 		});
+		AtomicInteger recordsCount = new AtomicInteger(0);
 		personDTOS.stream()
 				.map(personMapper)
 				.forEach(person -> {
@@ -173,8 +182,9 @@ public class PersonQuickSyncService {
 					}else {
 						personRepository.save(person);
 					}
+					recordsCount.incrementAndGet();
 				});
-		return getQuickSyncHistoryDTO(file, facility, personDTOS.size(), "person");
+		return getQuickSyncHistoryDTO(file, facility, personDTOS.size(), recordsCount.get(), "person");
 		
 		
 	}
@@ -211,11 +221,6 @@ public class PersonQuickSyncService {
 		
 	}
 	
-	
-//	public Object importBiometricData(Long facility, MultipartFile file) {
-//
-//	}
-	
 	public ByteArrayOutputStream generateBiometricData(HttpServletResponse response, Long facilityId, LocalDate start, LocalDate end) {
 		ByteArrayOutputStream bao = new ByteArrayOutputStream();
 		try{
@@ -230,70 +235,158 @@ public class PersonQuickSyncService {
 		}
 		return bao;
 	}
-	
-	public QuickSyncHistoryDTO importBiometricData(Long facilityId, MultipartFile file) throws IOException {
-		byte[] bytes = file.getBytes();
-		String data = new String(bytes, StandardCharsets.UTF_8);
-		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
-		ObjectMapper mapper = new ObjectMapper();
-		mapper.findAndRegisterModules();
-		configureMapperToHandleDate(mapper);
-		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
-		//LOG.info("data imported {}", biometrics);
-		LOG.info("biometric List: " + biometrics.size());
-		AtomicInteger total = new AtomicInteger();
-		int notSave = 0;
-		try {
-			biometrics.parallelStream()
-					.forEach(biometricDTO -> {
-						Optional<Person> existPerson =
-								personRepository.getPersonByUuidAndFacilityIdAndArchived(biometricDTO.getPerson().getUuid(),
-										biometricDTO.getPerson().getFacilityId(), 0);
-						if (!existPerson.isPresent()) {
-							Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
-							personRepository.save(person);
-						}
-						List<Biometric> currentBiometrics = biometricDTO.getBiometric()
-								.stream()
-								.map(biometricMapper)
-								.map(b -> {
-									b.setFacilityId(facilityId);
-									return b;
-								})
-								.collect(Collectors.toList());
-						currentBiometrics.parallelStream().forEach(b ->
-						{
-							LOG.info("id {}", b.getId());
-							List<Biometric> existBiometric =
-									biometricRepository.findAllByPersonUuid(b.getPersonUuid());
-							boolean alreadySaved = existBiometric.stream()
-									.anyMatch(eb -> eb.getCreatedBy().equals(b.getCreatedBy()));
-							
-							if (alreadySaved) {
-							} else {
-								biometricRepository.save(b);
-								total.getAndIncrement();
-							}
-						});
-					});
-		}catch (Exception e) {
-			notSave++;
-			e.printStackTrace();
-		}
-		LOG.error("not saved", notSave);
-		return getQuickSyncHistoryDTO(file, facility, total.get(), "biometric");
+/*
+Parallel processing implementation for future reference
+*/
+//	public QuickSyncHistoryDTO importBiometricData(Long facilityId, MultipartFile file) throws IOException {
+//		byte[] bytes = file.getBytes();
+//		String data = new String(bytes, StandardCharsets.UTF_8);
+//		OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+//		Optional<User> currentUser = this.userService.getUserWithRoles();
+//		User user = currentUser.get();
+//		ObjectMapper mapper = new ObjectMapper();
+//		mapper.findAndRegisterModules();
+//		configureMapperToHandleDate(mapper);
+//		List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
+//		AtomicInteger total = new AtomicInteger();
+//		int notSave = 0;
+//		try {
+//			biometrics.parallelStream()
+//					.forEach(biometricDTO -> {
+//						Optional<Person> existPerson =
+//								personRepository.getPersonByUuidAndFacilityIdAndArchived(biometricDTO.getPerson().getUuid(),
+//										biometricDTO.getPerson().getFacilityId(), 0);
+//						if (!existPerson.isPresent()) {
+//							Person person = personMapper.getPersonFromDTO(biometricDTO.getPerson());
+//							personRepository.save(person);
+//						}
+//						List<Biometric> currentBiometrics = biometricDTO.getBiometric()
+//								.stream()
+//								.map(meta -> {
+//									meta.setCreatedBy(user.getUserName());
+//									meta.setLastModifiedBy(user.getUserName());
+//									Biometric b = biometricMapper.apply(meta);
+//									b.setFacilityId(facilityId);
+//									b.setId(meta.getQSyncId());
+//									b.setCreatedBy(meta.getCreatedBy());
+//									b.setLastModifiedBy(meta.getLastModifiedBy());
+//									System.out.println("b before return4: "+b);
+//									return b;
+//								})
+//								.collect(Collectors.toList());
+//
+//
+//						currentBiometrics.parallelStream().forEach(b ->
+//						{
+//							List<Biometric> existBiometric =
+//									biometricRepository.findAllByPersonUuid(b.getPersonUuid());
+//							boolean alreadySaved = existBiometric.stream()
+//									.anyMatch(eb -> eb.getCreatedBy().equals(b.getCreatedBy()));
+//
+//							if (alreadySaved) {
+//							} else {
+//								biometricRepository.save(b);
+//								total.getAndIncrement();
+//							}
+//						});
+//					});
+//		}catch (Exception e) {
+//			notSave++;
+//			e.printStackTrace();
+//		}
+//		LOG.error("not saved", notSave);
+//		return getQuickSyncHistoryDTO(file, facility, total.get(), "biometric");
+//	}
+
+public QuickSyncHistoryDTO importBiometricData(Long facilityId, MultipartFile file) throws IOException {
+	// Check if the file has already been uploaded
+	String fileName = file.getOriginalFilename();
+	Boolean fileExists = quickSyncHistoryRepository.existsByFilename(fileName);
+	if(fileExists){
+		throw new IllegalArgumentException("This file has already been uploaded and processed. Please upload a different file.");
 	}
-	
+
+	byte[] bytes = file.getBytes();
+	String data = new String(bytes, StandardCharsets.UTF_8);
+
+	OrganisationUnit facility = organisationUnitRepository.getOne(facilityId);
+	Optional<User> currentUser = this.userService.getUserWithRoles();
+	User user = currentUser.get();
+
+	ObjectMapper mapper = new ObjectMapper();
+	mapper.findAndRegisterModules();
+	configureMapperToHandleDate(mapper);
+
+	List<BiometricDTO> biometrics = mapper.readValue(data, new TypeReference<List<BiometricDTO>>() {});
+	AtomicInteger total = new AtomicInteger();
+	int notSave = 0;
+	int recordsCount = 0;
+
+	for (BiometricDTO biometricDTO : biometrics) {
+		try {
+			// Ensure person exists or create new
+			Person person = personRepository
+					.getPersonByUuidAndFacilityIdAndArchived(
+							biometricDTO.getPerson().getUuid(),
+							biometricDTO.getPerson().getFacilityId(),
+							0
+					)
+					.orElseGet(() -> {
+						Person newPerson = personMapper.getPersonFromDTO(biometricDTO.getPerson());
+						return personRepository.save(newPerson);
+					});
+
+			// Process each biometric entry
+			for (BiometricMetaDataDTO meta : biometricDTO.getBiometric()) {
+				try {
+					// Check if biometric already exists by qsyncId
+					boolean biometricExists = biometricRepository.existsById(meta.getQSyncId());
+					if (biometricExists) {
+						continue;
+					}
+
+					// Set audit fields
+					meta.setCreatedBy(user.getUserName());
+					meta.setLastModifiedBy(user.getUserName());
+
+					Biometric b = biometricMapper.apply(meta);
+					b.setFacilityId(facilityId);
+					b.setId(meta.getQSyncId());
+					b.setRecaptureMessage(
+							b.getRecaptureMessage() != null ? b.getRecaptureMessage() + "_Sync-module" : "_Sync-module"
+					);
+					b.setCreatedBy(user.getUserName());
+					b.setLastModifiedBy(user.getUserName());
+
+					biometricRepository.save(b);
+					total.incrementAndGet();
+					recordsCount++;
+				} catch (Exception ex) {
+					notSave++;
+					LOG.error("Failed to save biometric: {}", meta.getQSyncId(), ex);
+				}
+			}
+		} catch (Exception ex) {
+			notSave++;
+			LOG.error("Failed to process biometricDTO for person: {}", biometricDTO.getPerson().getUuid(), ex);
+		}
+	}
+
+	LOG.error("not saved: {}", notSave);
+	return getQuickSyncHistoryDTO(file, facility, total.get(),recordsCount, "biometric");
+}
+
 	private static MutableConfigOverride configureMapperToHandleDate(ObjectMapper mapper) {
 		return mapper.configOverride(LocalDate.class);
 	}
 	
 	@NotNull
-	private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize, String tableName) {
+	private QuickSyncHistoryDTO getQuickSyncHistoryDTO(MultipartFile file, OrganisationUnit facility, int filesize,int recordsCount, String tableName) {
 		QuickSyncHistoryDTO historyDTO = QuickSyncHistoryDTO.builder()
 				.status("completed")
 				.filename(file.getOriginalFilename())
 				.facilityName(facility.getName())
+				.recordsCount(recordsCount)
 				.tableName(tableName)
 				.fileSize(filesize)
 				.dateUpdated(LocalDateTime.now())
@@ -302,6 +395,7 @@ public class PersonQuickSyncService {
 		quickSyncHistory.setFilename(historyDTO.getFilename());
 		quickSyncHistory.setStatus("completed");
 		quickSyncHistory.setTableName(historyDTO.getTableName());
+		quickSyncHistory.setRecordsCount(historyDTO.getRecordsCount());
 		quickSyncHistory.setFileSize(historyDTO.getFileSize());
 		quickSyncHistory.setFilename(file.getOriginalFilename());
 		quickSyncHistory.setFacilityName(historyDTO.getFacilityName());

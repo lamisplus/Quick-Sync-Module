@@ -32,6 +32,8 @@ public class BiometricDTOMapper  implements Function<Biometric, BiometricMetaDat
 				.imageQuality(biometric.getImageQuality())
 				.reason(biometric.getReason())
 				.count(biometric.getCount())
+				.createdBy(biometric.getCreatedBy())
+				.lastModifiedBy(biometric.getLastModifiedBy())
 				.build();
 	}
 }

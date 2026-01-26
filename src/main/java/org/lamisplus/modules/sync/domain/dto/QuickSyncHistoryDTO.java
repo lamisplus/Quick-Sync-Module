@@ -17,4 +17,5 @@ public class QuickSyncHistoryDTO {
 	LocalDateTime dateUpdated;
 	Integer fileSize;
 	String status;
+	Integer recordsCount;
 }
