@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.lamisplus.modules.base.domain.entities.OrganisationUnit;
 import org.lamisplus.modules.base.domain.repositories.OrganisationUnitRepository;
@@ -45,6 +46,7 @@ import java.util.zip.ZipInputStream;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class QRReaderService {
 
     private final PersonService personService;
@@ -1440,8 +1442,9 @@ public class QRReaderService {
                                 }
                             }
 
-                            String hospitalNumber = (String) clientIntakeData.get("hospitalNumber");
-                            String riskStratificationCode = (String) riskStratificationData.get("code");
+                            // Extract hospital number from person.identifier array
+                            String hospitalNumber = personData != null ? extractHospitalNumberFromPerson(personData) : null;
+                            String riskStratificationCode = riskStratificationData != null ? (String) riskStratificationData.get("code") : null;
 
                             // Get or create record result tracker
                             SyncRecordResult recordResult =
@@ -2105,6 +2108,56 @@ public class QRReaderService {
         }
 
         return response;
+    }
+
+
+    private String extractHospitalNumberFromPerson(Map<String, Object> personData) {
+        try {
+            if (personData == null) {
+                System.err.println("personData is null");
+                return null;
+            }
+
+            Object identifierObj = personData.get("identifier");
+            if (identifierObj == null) {
+                System.err.println("identifier field is null in personData");
+                return null;
+            }
+
+            String identifierJson = identifierObj.toString();
+            if (identifierJson == null || identifierJson.trim().isEmpty()) {
+                System.err.println("identifier JSON string is empty");
+                return null;
+            }
+
+            // Parse the identifier JSON string
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> identifiers = mapper.readValue(identifierJson, new TypeReference<List<Map<String, Object>>>() {});
+
+            if (identifiers == null || identifiers.isEmpty()) {
+                System.err.println("No identifiers found in the identifier array");
+                return null;
+            }
+
+            // Find the identifier with type "HospitalNumber"
+            for (Map<String, Object> identifier : identifiers) {
+                if (identifier == null) continue;
+
+                String type = (String) identifier.get("type");
+                if ("HospitalNumber".equals(type)) {
+                    String hospitalNumber = (String) identifier.get("value");
+//                    System.out.println("Extracted hospital number: " + hospitalNumber);
+                    return hospitalNumber;
+                }
+            }
+
+            System.err.println("No HospitalNumber identifier found in the array");
+        } catch (Exception e) {
+            System.err.println("Error extracting hospital number from person data: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
 }
