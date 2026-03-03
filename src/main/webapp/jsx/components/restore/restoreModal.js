@@ -12,6 +12,7 @@ import {
   FormGroup,
   Label,
   Input,
+  Spinner,
 } from "reactstrap";
 import MatButton from "@material-ui/core/Button";
 import { makeStyles } from "@material-ui/core/styles";
@@ -21,6 +22,7 @@ import { token, url as baseUrl } from "../../../api";
 import { DropzoneArea } from "material-ui-dropzone";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
 import { toast } from "react-toastify";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 const useStyles = makeStyles(theme => ({
   card: {
@@ -195,6 +197,10 @@ const DatabaseRestore = props => {
         }
       }
 
+      // Set loading to true before starting upload
+      setLoading(true);
+      toast.info("Upload in progress. Please wait...", { autoClose: false });
+
       if (fileName.includes("patient") === true) {
         axios
           .post(
@@ -207,11 +213,14 @@ const DatabaseRestore = props => {
           )
           .then(response => {
             setLoading(false);
+            toast.dismiss(); // Dismiss loading toast
             syncHistory();
             toast.success("Patient Json uploaded successfully");
+            props.togglestatus(); // Close modal after success
           })
           .catch(error => {
             setLoading(false);
+            toast.dismiss(); // Dismiss loading toast
             if (error.response && error.response.data) {
               let errorMessage =
                 error.response.data.apierror &&
@@ -237,11 +246,14 @@ const DatabaseRestore = props => {
           )
           .then(response => {
             setLoading(false);
+            toast.dismiss(); // Dismiss loading toast
             syncHistory();
             toast.success("Biometrics Json uploaded successfully");
+            props.togglestatus(); // Close modal after success
           })
           .catch(error => {
             setLoading(false);
+            toast.dismiss(); // Dismiss loading toast
             if (error.response && error.response.data) {
               let errorMessage =
                 error.response.data.apierror &&
@@ -266,20 +278,24 @@ const DatabaseRestore = props => {
           )
           .then(response => {
             setLoading(false);
+            toast.dismiss(); // Dismiss loading toast
             syncHistory();
 
             // Display detailed sync results
             const data = response.data;
             const successMsg = `lamisplus-export sync completed! Total: ${data.totalRecords}, Success: ${data.completelySuccessful}, Partial: ${data.partiallySuccessful}, Failed: ${data.completelyFailed}`;
-            toast.success(successMsg);
+            toast.success(successMsg, { autoClose: 8000 });
 
             // Log problem records if any
             if (data.problemRecords && data.problemRecords.length > 0) {
               console.log("Problem Records:", data.problemRecords);
             }
+
+            props.togglestatus(); // Close modal after success
           })
           .catch(error => {
             setLoading(false);
+            toast.dismiss(); // Dismiss loading toast
             if (error.response && error.response?.data) {
               let errorMessage =
                 error.response?.data && error.response.data !== ""
@@ -293,14 +309,14 @@ const DatabaseRestore = props => {
             }
           });
       } else {
+        setLoading(false);
+        toast.dismiss(); // Dismiss loading toast
         toast.error(
           "Upload failed. Please verify the filename format and retry."
         );
         return null;
       }
     }
-
-    props.togglestatus();
   };
 
   return (
@@ -368,6 +384,15 @@ const DatabaseRestore = props => {
                 </Row>
                 <br />
 
+                {loading && (
+                  <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                    <CircularProgress />
+                    <p style={{ marginTop: '10px', color: '#014D88', fontWeight: 'bold' }}>
+                      Syncing data, please wait...
+                    </p>
+                  </div>
+                )}
+
                 <br />
 
                 <MatButton
@@ -375,10 +400,11 @@ const DatabaseRestore = props => {
                   variant="contained"
                   color="primary"
                   className={classes.button}
-                  startIcon={<FileUploadIcon />}
+                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <FileUploadIcon />}
                   onClick={uploadProcess}
+                  disabled={loading}
                 >
-                  Upload
+                  {loading ? "Uploading..." : "Upload"}
                 </MatButton>
 
                 <MatButton
@@ -387,6 +413,7 @@ const DatabaseRestore = props => {
                   onClick={props.togglestatus}
                   className={classes.button}
                   startIcon={<CancelIcon />}
+                  disabled={loading}
                 >
                   Cancel
                 </MatButton>
