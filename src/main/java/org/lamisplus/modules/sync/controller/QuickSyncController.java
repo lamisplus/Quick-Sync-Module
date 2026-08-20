@@ -3,8 +3,10 @@ package org.lamisplus.modules.sync.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
+import org.lamisplus.modules.sync.domain.dto.PhsSyncResponse;
 import org.lamisplus.modules.sync.domain.dto.QuickSyncHistoryDTO;
 import org.lamisplus.modules.sync.dto.BatchSyncResponse;
+import org.lamisplus.modules.sync.service.PHSQuickSyncService;
 import org.lamisplus.modules.sync.service.PersonQuickSyncService;
 import org.lamisplus.modules.sync.service.QRReaderService;
 import org.springframework.http.HttpStatus;
@@ -30,6 +32,7 @@ public class QuickSyncController {
 	
 	private final PersonQuickSyncService questionQuickSyncService;
 	private final QRReaderService qrReaderService;
+	private final PHSQuickSyncService phsQuickSyncService;
 
 	@GetMapping("/export/person-data")
 	public void exportPersonData(HttpServletResponse response,
@@ -107,6 +110,24 @@ public class QuickSyncController {
 		}
 	}
 
+
+	@PostMapping("/import/phs-batch-sync")
+	public ResponseEntity<?> importPHSBatchSync(
+			@RequestParam("facilityId") Long facilityId,
+			@RequestParam("file") MultipartFile file) {
+		try {
+			PhsSyncResponse response = phsQuickSyncService.processZipFile(facilityId, file);
+			return ResponseEntity.ok(response);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+		} catch (IOException e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error processing ZIP file: " + e.getMessage());
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("An unexpected error occurred: " + e.getMessage());
+		}
+	}
 
 
 }

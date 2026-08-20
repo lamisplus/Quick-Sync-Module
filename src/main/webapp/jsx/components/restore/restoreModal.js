@@ -234,7 +234,8 @@ const DatabaseRestore = props => {
               );
             }
           });
-      } else if (fileName.includes("biometrics") === true) {
+      }
+      else if (fileName.includes("biometrics") === true) {
         axios
           .post(
             `${baseUrl}quick-sync/import/biometric-data?facilityId=${upload.facilityId}`,
@@ -267,48 +268,93 @@ const DatabaseRestore = props => {
               );
             }
           });
-      } else if (fileName.toLowerCase().includes("lamisplus-export") === true) {
+      }
+
+    else if (fileName.toLowerCase().includes("lamisplus-export") === true) {
         axios
-          .post(
-            `${baseUrl}quick-sync/import/hts-batch-sync?facilityId=${upload.facilityId}`,
-            formData,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          )
-          .then(response => {
-            setLoading(false);
-            toast.dismiss(); // Dismiss loading toast
-            syncHistory();
+            .post(
+                `${baseUrl}quick-sync/import/phs-batch-sync?facilityId=${upload.facilityId}`,
+                formData,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+            )
+            .then(response => {
+              setLoading(false);
+              toast.dismiss(); // Dismiss loading toast
+              syncHistory();
 
-            // Display detailed sync results
-            const data = response.data;
-            const successMsg = `lamisplus-export sync completed! Total: ${data.totalRecords}, Success: ${data.completelySuccessful}, Partial: ${data.partiallySuccessful}, Failed: ${data.completelyFailed}`;
-            toast.success(successMsg, { autoClose: 8000 });
+              // Display detailed sync results
+              const data = response.data;
+              const successMsg = `PHS Sync completed! Total: ${data.totalRecords}, Success: ${data.completelySuccessful}, Partial: ${data.partiallySuccessful}, Failed: ${data.completelyFailed}`;
+              toast.success(successMsg, { autoClose: 8000 });
 
-            // Log problem records if any
-            if (data.problemRecords && data.problemRecords.length > 0) {
-              console.log("Problem Records:", data.problemRecords);
-            }
+              // Log problem records if any
+              if (data.problemRecords && data.problemRecords.length > 0) {
+                console.log("PHS Problem Records:", data.problemRecords);
+              }
+              props.togglestatus(); // Close modal after success
+            })
+            .catch(error => {
+              setLoading(false);
+              toast.dismiss(); // Dismiss loading toast
+              if (error.response && error.response?.data) {
+                let errorMessage =
+                    error.response?.data && error.response.data !== ""
+                        ? error.response?.data
+                        : "Something went wrong uploading PHS data, please try again";
+                toast.error(errorMessage);
+              } else {
+                toast.error("Something went wrong uploading PHS data. Please try again...");
+              }
+            });
+      }
+      // ---> END NEW PHS SYNC LOGIC <---
 
-            props.togglestatus(); // Close modal after success
-          })
-          .catch(error => {
-            setLoading(false);
-            toast.dismiss(); // Dismiss loading toast
-            if (error.response && error.response?.data) {
-              let errorMessage =
-                error.response?.data && error.response.data !== ""
-                  ? error.response?.data
-                  : "Something went wrong uploading, please try again";
-              toast.error(errorMessage);
-            } else {
-              toast.error(
-                "Something went wrong uploading. Please try again..."
-              );
-            }
-          });
-      } else {
+
+      // else if (fileName.toLowerCase().includes("lamisplus-export") === true) {
+      //   axios
+      //     .post(
+      //       `${baseUrl}quick-sync/import/hts-batch-sync?facilityId=${upload.facilityId}`,
+      //       formData,
+      //       {
+      //         headers: { Authorization: `Bearer ${token}` },
+      //       }
+      //     )
+      //     .then(response => {
+      //       setLoading(false);
+      //       toast.dismiss(); // Dismiss loading toast
+      //       syncHistory();
+      //
+      //       // Display detailed sync results
+      //       const data = response.data;
+      //       const successMsg = `lamisplus-export sync completed! Total: ${data.totalRecords}, Success: ${data.completelySuccessful}, Partial: ${data.partiallySuccessful}, Failed: ${data.completelyFailed}`;
+      //       toast.success(successMsg, { autoClose: 8000 });
+      //
+      //       // Log problem records if any
+      //       if (data.problemRecords && data.problemRecords.length > 0) {
+      //         console.log("Problem Records:", data.problemRecords);
+      //       }
+      //
+      //       props.togglestatus(); // Close modal after success
+      //     })
+      //     .catch(error => {
+      //       setLoading(false);
+      //       toast.dismiss(); // Dismiss loading toast
+      //       if (error.response && error.response?.data) {
+      //         let errorMessage =
+      //           error.response?.data && error.response.data !== ""
+      //             ? error.response?.data
+      //             : "Something went wrong uploading, please try again";
+      //         toast.error(errorMessage);
+      //       } else {
+      //         toast.error(
+      //           "Something went wrong uploading. Please try again..."
+      //         );
+      //       }
+      //     });
+      // }
+      else {
         setLoading(false);
         toast.dismiss(); // Dismiss loading toast
         toast.error(
