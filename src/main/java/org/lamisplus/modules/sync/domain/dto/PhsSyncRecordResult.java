@@ -20,10 +20,19 @@ public class PhsSyncRecordResult {
 
     private String hospitalNumber;
     private String clientCode;
+    private String ancNo;
+    private String pmtctCycleUuid;
 
     private Long personId;
     private Long htsEncounterId;
     private Long ictEncounterId;
+    private Long pmtctHtsEncounterId;
+    private Long pmtctHtsRetestingEncounterId;
+    private Long pmtctEnrollmentAncEncounterId;
+    private Long pmtctRevisitEncounterId;
+    private Long pmtctMotherFollowUpVisitEncounterId;
+    private Long pmtctChildFollowUpVisitEncounterId;
+    private Long infantRegistrationEncounterId;
 
     /** COMPLETELY_SUCCESSFUL | PARTIALLY_SUCCESSFUL | COMPLETELY_FAILED | SKIPPED */
     private String status;

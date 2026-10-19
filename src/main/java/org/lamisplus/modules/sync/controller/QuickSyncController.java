@@ -78,37 +78,37 @@ public class QuickSyncController {
 	}
 
 
-	@PostMapping("/upload-client-zip")
-	public ResponseEntity<?> uploadZipFile(@RequestParam Long facilityId, @RequestParam("file") MultipartFile file) {
-		try {
-			List<Map<String, Object>> result = qrReaderService.processZipFile( facilityId,file);
-			return ResponseEntity.ok(result);
-		} catch (IllegalArgumentException e) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-		} catch (IOException e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
-		}
-	}
+//	@PostMapping("/upload-client-zip")
+//	public ResponseEntity<?> uploadZipFile(@RequestParam Long facilityId, @RequestParam("file") MultipartFile file) {
+//		try {
+//			List<Map<String, Object>> result = qrReaderService.processZipFile( facilityId,file);
+//			return ResponseEntity.ok(result);
+//		} catch (IllegalArgumentException e) {
+//			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+//		} catch (IOException e) {
+//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing ZIP file: " + e.getMessage());
+//		}
+//	}
 
 
-	@PostMapping("/import/hts-batch-sync")
-	public ResponseEntity<?> importHTSBatchSync(
-			@RequestParam("facilityId") Long facilityId,
-			@RequestParam("file") MultipartFile file) {
-		try {
-
-			BatchSyncResponse response = qrReaderService.processZipFileWithUpdateLogic(facilityId, file);
-			return ResponseEntity.ok(response);
-		} catch (IllegalArgumentException e) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-		} catch (IOException e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error processing ZIP file: " + e.getMessage());
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("An unexpected error occurred: " + e.getMessage());
-		}
-	}
+//	@PostMapping("/import/hts-batch-sync")
+//	public ResponseEntity<?> importHTSBatchSync(
+//			@RequestParam("facilityId") Long facilityId,
+//			@RequestParam("file") MultipartFile file) {
+//		try {
+//
+//			BatchSyncResponse response = qrReaderService.processZipFileWithUpdateLogic(facilityId, file);
+//			return ResponseEntity.ok(response);
+//		} catch (IllegalArgumentException e) {
+//			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+//		} catch (IOException e) {
+//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//					.body("Error processing ZIP file: " + e.getMessage());
+//		} catch (Exception e) {
+//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//					.body("An unexpected error occurred: " + e.getMessage());
+//		}
+//	}
 
 
 	@PostMapping("/import/phs-batch-sync")

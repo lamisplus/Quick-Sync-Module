@@ -17,6 +17,21 @@ import org.lamisplus.modules.patient.domain.dto.PersonResponseDto;
 import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.patient.service.PersonService;
+import org.lamisplus.modules.pmtct.domain.dto.ANCEnrollementRequestDto;
+import org.lamisplus.modules.pmtct.domain.dto.ANCRespondDto;
+import org.lamisplus.modules.pmtct.domain.dto.DeliveryRequestDto;
+import org.lamisplus.modules.pmtct.domain.dto.DeliveryResponseDto;
+import org.lamisplus.modules.pmtct.domain.dto.InfantDto;
+import org.lamisplus.modules.pmtct.domain.dto.InfantDtoResponse;
+import org.lamisplus.modules.pmtct.domain.dto.InfantVisitRequestDto;
+import org.lamisplus.modules.pmtct.domain.dto.InfantVisitResponseDto;
+import org.lamisplus.modules.pmtct.domain.dto.PmtctVisitRequestDto;
+import org.lamisplus.modules.pmtct.domain.dto.PmtctVisitResponseDto;
+import org.lamisplus.modules.pmtct.service.ANCService;
+import org.lamisplus.modules.pmtct.service.DeliveryService;
+import org.lamisplus.modules.pmtct.service.InfantService;
+import org.lamisplus.modules.pmtct.service.InfantVisitService;
+import org.lamisplus.modules.pmtct.service.PmtctVisitService;
 import org.lamisplus.modules.sync.domain.QuickSyncHistory;
 import org.lamisplus.modules.sync.domain.dto.PhsSyncRecordResult;
 import org.lamisplus.modules.sync.domain.dto.PhsSyncResponse;
@@ -66,6 +81,11 @@ public class PHSQuickSyncService {
     private final PersonService personService;
     private final PersonRepository personRepository;
     private final HtsEncounterService htsEncounterService;
+    private final ANCService ancService;
+    private final DeliveryService deliveryService;
+    private final PmtctVisitService pmtctVisitService;
+    private final InfantVisitService infantVisitService;
+    private final InfantService infantService;
     private final IctEncounterService ictEncounterService;
     private final OrganisationUnitRepository organisationUnitRepository;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
@@ -95,6 +115,15 @@ public class PHSQuickSyncService {
         int personCreated = 0, personUpdated = 0, personFailed = 0;
         int htsCreated = 0, htsSkipped = 0, htsFailed = 0;
         int ictCreated = 0, ictSkipped = 0, ictFailed = 0;
+        int pmtctHtsCreated = 0, pmtctHtsSkipped = 0, pmtctHtsFailed = 0;
+        int pmtctHtsRetestingCreated = 0, pmtctHtsRetestingSkipped = 0, pmtctHtsRetestingFailed = 0;
+        int pmtctEnrollmentAncCreated = 0, pmtctEnrollmentAncSkipped = 0, pmtctEnrollmentAncFailed = 0;
+        int pmtctLabourDeliveryCreated = 0, pmtctLabourDeliverySkipped = 0, pmtctLabourDeliveryFailed = 0;
+        int pmtctAncRevisitCreated = 0, pmtctAncRevisitSkipped = 0, pmtctAncRevisitFailed = 0;
+        int pmtctMipCreated = 0, pmtctMipSkipped = 0, pmtctMipFailed = 0;
+        int pmtctMotherFollowUpVisitCreated = 0, pmtctMotherFollowUpVisitSkipped = 0, pmtctMotherFollowUpVisitFailed = 0;
+        int pmtctChildFollowUpVisitCreated = 0, pmtctChildFollowUpVisitSkipped = 0, pmtctChildFollowUpVisitFailed = 0;
+        int pmtctInfantRegistrationCreated = 0, pmtctInfantRegistrationSkipped = 0, pmtctInfantRegistrationFailed = 0;
 
         List<PhsSyncRecordResult> allResults = new ArrayList<>();
 
@@ -123,6 +152,15 @@ public class PHSQuickSyncService {
                 Object personField = record.get("person");
                 Object htsField = record.get("hts");
                 Object ictField = record.get("ict");
+                Object pmtctEnrollmentAncField = record.get("anc");
+                Object pmtctHtsField = record.get("pmtctHts");
+                Object pmtctHtsRetestingField = record.get("pmtctRetesting");
+                Object pmtctLabourDeliveryField = record.get("labourDelivery");
+                Object pmtctInfantRegistrationField = record.get("infantRegistration");
+                Object pmtctAncRevisitField = record.get("ancRevisit");
+                Object pmtctMipField = record.get("motherInfantPairCard");
+                Object pmtctChildFollowUpVisitField = record.get("childFollowupVisit");
+                Object pmtctMotherFollowUpVisitField = record.get("motherFollowupVisit");
 
                 if (!(personField instanceof Map)) {
                     // Nothing to anchor this record to — skip it.
@@ -210,7 +248,8 @@ public class PHSQuickSyncService {
                         successfulComponents.add("hts");
                         htsCreated++;
                     } catch (Exception e) {
-                        System.err.println("PHS sync: failed to process hts encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());                        failedComponents.add("hts: " + e.getMessage());
+                        System.err.println("PHS sync: failed to process hts encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("hts: " + e.getMessage());
                         htsFailed++;
                     }
                 } else {
@@ -247,6 +286,238 @@ public class PHSQuickSyncService {
                 } else {
                     ictSkipped++;
                 }
+
+                // 4. PMTCT_ENROLLMENT_ANC -----------------------------------------------------------------
+                Long pmtctEnrollmentAncEncounterId = null;
+                if (pmtctEnrollmentAncField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctEnrollmentAncData = (Map<String, Object>) pmtctEnrollmentAncField;
+
+                        ANCEnrollementRequestDto ancEnrollementRequestDto =
+                                objectMapper.convertValue(pmtctEnrollmentAncData, ANCEnrollementRequestDto.class);
+//                        ancEnrollementRequestDto.setPatient_uuid();
+
+                        ANCRespondDto ancRespondDto = ancService.ANCEnrollement(ancEnrollementRequestDto);
+                        pmtctEnrollmentAncEncounterId = ancRespondDto.getId();
+                        resultBuilder.pmtctEnrollmentAncEncounterId(pmtctEnrollmentAncEncounterId);
+                        resultBuilder.ancNo(ancEnrollementRequestDto.getAncNo());
+                        successfulComponents.add("anc");
+                        pmtctEnrollmentAncCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct enrollment ANC encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("anc: " + e.getMessage());
+                        pmtctEnrollmentAncFailed++;
+                    }
+                } else {
+                    pmtctEnrollmentAncSkipped++;
+                }
+
+                // 5. PMTCT_HTS -----------------------------------------------------------------
+                Long pmtctHtsEncounterId = null;
+                if (pmtctHtsField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> htsData = (Map<String, Object>) pmtctHtsField;
+
+                        HtsEncounterRequestDTO pmtctHtsRequest =
+                                objectMapper.convertValue(htsData, HtsEncounterRequestDTO.class);
+                        pmtctHtsRequest.setPatientId(patientId);
+                        if (pmtctHtsRequest.getFacilityId() == null) {
+                            pmtctHtsRequest.setFacilityId(facilityId);
+                        }
+
+                        HtsEncounterResponse pmtctHtsResponse = htsEncounterService.save(pmtctHtsRequest);
+                        pmtctHtsEncounterId = pmtctHtsResponse.getId();
+                        resultBuilder.pmtctHtsEncounterId(pmtctHtsEncounterId);
+                        resultBuilder.clientCode(pmtctHtsRequest.getClientCode());
+                        successfulComponents.add("pmtctHts");
+                        pmtctHtsCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct-hts encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("pmtctHts: " + e.getMessage());
+                        pmtctHtsFailed++;
+                    }
+                } else {
+                    pmtctHtsSkipped++;
+                }
+
+                // 6. PMTCT_RETESTING -----------------------------------------------------------------
+                Long pmtctHtsRetestingEncounterId = null;
+                if (pmtctHtsRetestingField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctHtsRetestingData = (Map<String, Object>) pmtctHtsRetestingField;
+
+                        HtsEncounterRequestDTO pmtctHtsRequest =
+                                objectMapper.convertValue(pmtctHtsRetestingData, HtsEncounterRequestDTO.class);
+                        pmtctHtsRequest.setPatientId(patientId);
+                        if (pmtctHtsRequest.getFacilityId() == null) {
+                            pmtctHtsRequest.setFacilityId(facilityId);
+                        }
+
+                        HtsEncounterResponse pmtctHtsResponse = htsEncounterService.save(pmtctHtsRequest);
+                        pmtctHtsRetestingEncounterId = pmtctHtsResponse.getId();
+                        resultBuilder.pmtctHtsRetestingEncounterId(pmtctHtsRetestingEncounterId);
+                        resultBuilder.clientCode(pmtctHtsRequest.getClientCode());
+                        successfulComponents.add("pmtctRetesting");
+                        pmtctHtsRetestingCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct-hts retesting encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("pmtctRetesting: " + e.getMessage());
+                        pmtctHtsRetestingFailed++;
+                    }
+                } else {
+                    pmtctHtsRetestingSkipped++;
+                }
+
+                //  7. PMTCT_REVISIT -----------------------------------------------------------------
+                Long pmtctAncRevisitEncounterId = null;
+                if (pmtctAncRevisitField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctAncRevisitFieldData = (Map<String, Object>) pmtctAncRevisitField;
+
+                        PmtctVisitRequestDto pmtctVisitRequestDto =
+                                objectMapper.convertValue(pmtctAncRevisitFieldData, PmtctVisitRequestDto.class);
+
+                        PmtctVisitResponseDto pmtctVisitResponseDto = pmtctVisitService.save(pmtctVisitRequestDto);
+                        pmtctAncRevisitEncounterId = Long.valueOf(pmtctVisitResponseDto.getId());
+                        resultBuilder.pmtctRevisitEncounterId(pmtctAncRevisitEncounterId);
+//                        resultBuilder.pmtctCycleUuid(pmtctVisitResponseDto.getPmtctCycleUuid());
+                        successfulComponents.add("ancRevisit");
+                        pmtctAncRevisitCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct anc revisit encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("ancRevisit: " + e.getMessage());
+                        pmtctAncRevisitFailed++;
+                    }
+                } else {
+                    pmtctAncRevisitSkipped++;
+                }
+
+                // 8. PMTCT_MIP -----------------------------------------------------------------
+                Long pmtctMipId = null;
+                if (pmtctMipField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctMipData = (Map<String, Object>) pmtctMipField;
+
+                        ANCEnrollementRequestDto pmtctMipRequestDto =
+                                objectMapper.convertValue(pmtctMipData, ANCEnrollementRequestDto.class);
+
+                        ANCRespondDto ancRespondDto = ancService.ANCEnrollement(pmtctMipRequestDto);
+                        pmtctMipId = ancRespondDto.getId();
+                        resultBuilder.pmtctEnrollmentAncEncounterId(pmtctMipId);
+                        resultBuilder.ancNo(pmtctMipRequestDto.getAncNo());
+                        successfulComponents.add("motherInfantPairCard");
+                        pmtctMipCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct MIP for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("motherInfantPairCard: " + e.getMessage());
+                        pmtctMipFailed++;
+                    }
+                } else {
+                    pmtctMipSkipped++;
+                }
+
+                // 9. PMTCT_ENROLLMENT_L&D -----------------------------------------------------------------
+                Long pmtctEnrollmentLndEncounterId = null;
+                if (pmtctLabourDeliveryField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctLabourDeliveryData = (Map<String, Object>) pmtctLabourDeliveryField;
+
+                        DeliveryRequestDto deliveryRequestDto =
+                                objectMapper.convertValue(pmtctLabourDeliveryData, DeliveryRequestDto.class);
+
+                        DeliveryResponseDto deliveryResponseDto = deliveryService.save(deliveryRequestDto);
+                        pmtctEnrollmentLndEncounterId = deliveryResponseDto.getId();
+                        resultBuilder.pmtctEnrollmentAncEncounterId(pmtctEnrollmentLndEncounterId);
+//                        resultBuilder.pmtctCycleUuid(deliveryResponseDto.getPmtctCycleUuid());
+                        successfulComponents.add("labourDelivery");
+                        pmtctLabourDeliveryCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct labour and delivery encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("labourDelivery: " + e.getMessage());
+                        pmtctLabourDeliveryFailed++;
+                    }
+                } else {
+                    pmtctLabourDeliverySkipped++;
+                }
+
+                // 10. PMTCT_INFANT_REGISTRATION -----------------------------------------------------------------
+                Long pmtctInfantRegistrationEncounterId = null;
+                if (pmtctInfantRegistrationField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> infantRegistrationFieldData = (Map<String, Object>) pmtctInfantRegistrationField;
+
+                        InfantDto infantRegistrationRequestDto =
+                                objectMapper.convertValue(infantRegistrationFieldData, InfantDto.class);
+
+                        InfantDtoResponse infantRegistrationResponseDto = infantService.save(infantRegistrationRequestDto);
+                        pmtctInfantRegistrationEncounterId = Long.valueOf(infantRegistrationResponseDto.getInfant().getId());
+                        resultBuilder.infantRegistrationEncounterId(pmtctInfantRegistrationEncounterId);
+                        successfulComponents.add("infantRegistration");
+                        pmtctInfantRegistrationCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process infant registration encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("infantRegistration: " + e.getMessage());
+                        pmtctInfantRegistrationFailed++;
+                    }
+                } else {
+                    pmtctInfantRegistrationSkipped++;
+                }
+
+                // 11. PMTCT_CHILD_FOLLOW_UP_VISIT -----------------------------------------------------------------
+                Long pmtctChildFollowUpVisitEncounterId = null;
+                if (pmtctChildFollowUpVisitField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctChildFollowUpVisitData = (Map<String, Object>) pmtctChildFollowUpVisitField;
+
+                        InfantVisitRequestDto pmtctChildFollowUpVisitRequestDto =
+                                objectMapper.convertValue(pmtctChildFollowUpVisitData, InfantVisitRequestDto.class);
+
+                        InfantVisitResponseDto pmtctChildFollowUpVisitResponseDto = infantVisitService.save(pmtctChildFollowUpVisitRequestDto);
+                        pmtctChildFollowUpVisitEncounterId = Long.valueOf(pmtctChildFollowUpVisitResponseDto.getId());
+                        resultBuilder.pmtctChildFollowUpVisitEncounterId(pmtctChildFollowUpVisitEncounterId);
+                        successfulComponents.add("childFollowupVisit");
+                        pmtctChildFollowUpVisitCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct child follow up visit encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("childFollowupVisit: " + e.getMessage());
+                        pmtctChildFollowUpVisitFailed++;
+                    }
+                } else {
+                    pmtctChildFollowUpVisitSkipped++;
+                }
+
+                // 12. PMTCT_MOTHER_FOLLOW_UP_VISIT -----------------------------------------------------------------
+                Long pmtctMotherFollowUpVisitEncounterId = null;
+                if (pmtctMotherFollowUpVisitField instanceof Map) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> pmtctMotherFollowUpVisitData = (Map<String, Object>) pmtctMotherFollowUpVisitField;
+
+                        PmtctVisitRequestDto pmtctMotherFollowUpVisitRequestDto =
+                                objectMapper.convertValue(pmtctMotherFollowUpVisitData, PmtctVisitRequestDto.class);
+
+                        PmtctVisitResponseDto pmtctVisitResponseDto = pmtctVisitService.save(pmtctMotherFollowUpVisitRequestDto);
+                        pmtctMotherFollowUpVisitEncounterId = Long.valueOf(pmtctVisitResponseDto.getId());
+                        resultBuilder.pmtctMotherFollowUpVisitEncounterId(pmtctMotherFollowUpVisitEncounterId);
+                        successfulComponents.add("motherFollowupVisit");
+                        pmtctMotherFollowUpVisitCreated++;
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to process pmtct mother follow up visit encounter for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        failedComponents.add("motherFollowupVisit: " + e.getMessage());
+                        pmtctMotherFollowUpVisitFailed++;
+                    }
+                } else {
+                    pmtctMotherFollowUpVisitSkipped++;
+                }
+
 
                 // Roll up this record's status ---------------------------------------------
                 String status;
@@ -287,6 +558,33 @@ public class PHSQuickSyncService {
                 .ictCreated(ictCreated)
                 .ictSkipped(ictSkipped)
                 .ictFailed(ictFailed)
+                .pmtctHtsCreated(pmtctHtsCreated)
+                .pmtctHtsSkipped(pmtctHtsSkipped)
+                .pmtctHtsFailed(pmtctHtsFailed)
+                .pmtctHtsRetestingCreated(pmtctHtsRetestingCreated)
+                .pmtctHtsRetestingSkipped(pmtctHtsRetestingSkipped)
+                .pmtctHtsRetestingFailed(pmtctHtsRetestingFailed)
+                .pmtctEnrollmentAncCreated(pmtctEnrollmentAncCreated)
+                .pmtctEnrollmentAncSkipped(pmtctEnrollmentAncSkipped)
+                .pmtctEnrollmentAncFailed(pmtctEnrollmentAncFailed)
+                .pmtctLabourDeliveryCreated(pmtctLabourDeliveryCreated)
+                .pmtctLabourDeliverySkipped(pmtctLabourDeliverySkipped)
+                .pmtctLabourDeliveryFailed(pmtctLabourDeliveryFailed)
+                .pmtctAncRevisitCreated(pmtctAncRevisitCreated)
+                .pmtctAncRevisitSkipped(pmtctAncRevisitSkipped)
+                .pmtctAncRevisitFailed(pmtctAncRevisitFailed)
+                .pmtctMipCreated(pmtctMipCreated)
+                .pmtctMipSkipped(pmtctMipSkipped)
+                .pmtctMipFailed(pmtctMipFailed)
+                .pmtctMotherFollowUpVisitCreated(pmtctMotherFollowUpVisitCreated)
+                .pmtctMotherFollowUpVisitSkipped(pmtctMotherFollowUpVisitSkipped)
+                .pmtctMotherFollowUpVisitFailed(pmtctMotherFollowUpVisitFailed)
+                .pmtctChildFollowUpVisitCreated(pmtctChildFollowUpVisitCreated)
+                .pmtctChildFollowUpVisitSkipped(pmtctChildFollowUpVisitSkipped)
+                .pmtctChildFollowUpVisitFailed(pmtctChildFollowUpVisitFailed)
+                .pmtctInfantRegistrationCreated(pmtctInfantRegistrationCreated)
+                .pmtctInfantRegistrationSkipped(pmtctInfantRegistrationSkipped)
+                .pmtctInfantRegistrationFailed(pmtctInfantRegistrationFailed)
                 .build();
 
         List<PhsSyncRecordResult> problemRecords = new ArrayList<>();
