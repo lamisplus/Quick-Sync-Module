@@ -48,25 +48,6 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/**
- * Processes PHS (Person -> HTS -> ICT) quick-sync zip bundles.
- * <p>
- * Structurally this mirrors {@link QRReaderService}: a zip file made up of one entry per
- * record, each entry being a base64-encoded, gzip-compressed JSON payload. The difference
- * is the shape of the payload — instead of the HtsClient/RiskStratification/... structure
- * that QRReaderService expects, each record here is a flat bundle of three optional keys:
- * <pre>
- * {
- *   "person": { ... PersonDto-shaped fields ... },
- *   "hts":    { ... HtsEncounterRequestDTO-shaped fields ... },
- *   "ict":    { ... IctEncounterRequest-shaped fields, including "contacts" ... }
- * }
- * </pre>
- * For each record: the person is created (or matched to an existing person on the same
- * facility by hospital number), then — if present — an HTS encounter is saved against that
- * person, then — if present — an ICT encounter is saved against that person and auto-linked
- * to the HTS encounter that was just created/updated in the same record.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -228,13 +209,26 @@ public class PHSQuickSyncService {
                 // 1.5 ENSURE PREGNANCY CYCLE EXISTS (if any PMTCT forms are present) -------
                 // Extract pmtctCycleUuid from any PMTCT section in the payload
                 String pmtctCycleUuid = extractPmtctCycleUuid(record);
-                if (pmtctCycleUuid != null && !pmtctCycleUuid.isEmpty()) {
+                boolean hasPmtctCycle = pmtctCycleUuid != null && !pmtctCycleUuid.isEmpty();
+
+                if (hasPmtctCycle) {
                     try {
                         ensurePregnancyCycleExists(pmtctCycleUuid, personUuid, record, facilityId, hospitalNumber);
                     } catch (Exception e) {
                         System.err.println("PHS sync: failed to ensure pregnancy cycle exists for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
                         // Don't fail the entire record, but log the issue
                         // PMTCT forms will fail later with foreign key constraint if cycle creation failed
+                    }
+                } else {
+                    // No pmtctCycleUuid found - check if any PMTCT forms are present
+                    boolean hasPmtctForms = pmtctEnrollmentAncField != null || pmtctHtsField != null ||
+                                           pmtctHtsRetestingField != null || pmtctAncRevisitField != null ||
+                                           pmtctMipField != null || pmtctLabourDeliveryField != null ||
+                                           pmtctInfantRegistrationField != null || pmtctChildFollowUpVisitField != null ||
+                                           pmtctMotherFollowUpVisitField != null;
+
+                    if (hasPmtctForms) {
+                        System.err.println("PHS sync: PMTCT forms present but pmtctCycleUuid missing for hospitalNumber=" + hospitalNumber + " - skipping all PMTCT forms");
                     }
                 }
 
@@ -300,7 +294,7 @@ public class PHSQuickSyncService {
 
                 // 4. PMTCT_ENROLLMENT_ANC -----------------------------------------------------------------
                 Long pmtctEnrollmentAncEncounterId = null;
-                if (pmtctEnrollmentAncField instanceof Map) {
+                if (hasPmtctCycle && pmtctEnrollmentAncField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> ancData = (Map<String, Object>) pmtctEnrollmentAncField;
@@ -369,7 +363,7 @@ public class PHSQuickSyncService {
 
                 // 5. PMTCT_HTS -----------------------------------------------------------------
                 Long pmtctHtsEncounterId = null;
-                if (pmtctHtsField instanceof Map) {
+                if (hasPmtctCycle && pmtctHtsField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> htsData = (Map<String, Object>) pmtctHtsField;
@@ -397,7 +391,7 @@ public class PHSQuickSyncService {
 
                 // 6. PMTCT_RETESTING -----------------------------------------------------------------
                 Long pmtctHtsRetestingEncounterId = null;
-                if (pmtctHtsRetestingField instanceof Map) {
+                if (hasPmtctCycle && pmtctHtsRetestingField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> pmtctHtsRetestingData = (Map<String, Object>) pmtctHtsRetestingField;
@@ -426,7 +420,7 @@ public class PHSQuickSyncService {
 
                 //  7. PMTCT_REVISIT -----------------------------------------------------------------
                 Long pmtctAncRevisitEncounterId = null;
-                if (pmtctAncRevisitField instanceof Map) {
+                if (hasPmtctCycle && pmtctAncRevisitField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> pmtctAncRevisitFieldData = (Map<String, Object>) pmtctAncRevisitField;
@@ -451,7 +445,7 @@ public class PHSQuickSyncService {
 
                 // 8. PMTCT_MIP -----------------------------------------------------------------
                 Long pmtctMipId = null;
-                if (pmtctMipField instanceof Map) {
+                if (hasPmtctCycle && pmtctMipField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> mipData = (Map<String, Object>) pmtctMipField;
@@ -520,7 +514,7 @@ public class PHSQuickSyncService {
 
                 // 9. PMTCT_ENROLLMENT_L&D -----------------------------------------------------------------
                 Long pmtctEnrollmentLndEncounterId = null;
-                if (pmtctLabourDeliveryField instanceof Map) {
+                if (hasPmtctCycle && pmtctLabourDeliveryField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> pmtctLabourDeliveryData = (Map<String, Object>) pmtctLabourDeliveryField;
@@ -545,7 +539,7 @@ public class PHSQuickSyncService {
 
                 // 10. PMTCT_INFANT_REGISTRATION -----------------------------------------------------------------
                 Long pmtctInfantRegistrationEncounterId = null;
-                if (pmtctInfantRegistrationField instanceof Map) {
+                if (hasPmtctCycle && pmtctInfantRegistrationField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> infantRegistrationFieldData = (Map<String, Object>) pmtctInfantRegistrationField;
@@ -569,7 +563,7 @@ public class PHSQuickSyncService {
 
                 // 11. PMTCT_CHILD_FOLLOW_UP_VISIT -----------------------------------------------------------------
                 Long pmtctChildFollowUpVisitEncounterId = null;
-                if (pmtctChildFollowUpVisitField instanceof Map) {
+                if (hasPmtctCycle && pmtctChildFollowUpVisitField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> pmtctChildFollowUpVisitData = (Map<String, Object>) pmtctChildFollowUpVisitField;
@@ -593,7 +587,7 @@ public class PHSQuickSyncService {
 
                 // 12. PMTCT_MOTHER_FOLLOW_UP_VISIT -----------------------------------------------------------------
                 Long pmtctMotherFollowUpVisitEncounterId = null;
-                if (pmtctMotherFollowUpVisitField instanceof Map) {
+                if (hasPmtctCycle && pmtctMotherFollowUpVisitField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> pmtctMotherFollowUpVisitData = (Map<String, Object>) pmtctMotherFollowUpVisitField;
@@ -839,11 +833,6 @@ public class PHSQuickSyncService {
         return null;
     }
 
-    /**
-     * Ensures a pregnancy cycle exists in the database.
-     * If the cycle UUID doesn't exist, creates it using data from the payload.
-     * This prevents foreign key constraint violations when PMTCT forms reference the cycle.
-     */
     @SuppressWarnings("unchecked")
     private void ensurePregnancyCycleExists(String pmtctCycleUuid, String patientUuid,
                                            Map<String, Object> record, Long facilityId,
@@ -878,10 +867,7 @@ public class PHSQuickSyncService {
         System.out.println("PHS sync: Successfully created pregnancy cycle " + pmtctCycleUuid);
     }
 
-    /**
-     * Extracts entry point from the payload by checking multiple PMTCT sections.
-     * Maps frontend entry point codes to backend codes.
-     */
+
     @SuppressWarnings("unchecked")
     private String extractEntryPoint(Map<String, Object> record) {
         // Check ANC section first
@@ -924,10 +910,7 @@ public class PHSQuickSyncService {
         return "ANC";
     }
 
-    /**
-     * Maps frontend entry point codes to backend codes.
-     * Frontend uses codes like "PMTCT_ENTRY_POINT_ANC", backend uses "ANC".
-     */
+
     private String mapEntryPoint(String entryPoint) {
         if (entryPoint == null) {
             return "ANC";
