@@ -17,16 +17,9 @@ import org.lamisplus.modules.patient.domain.dto.PersonResponseDto;
 import org.lamisplus.modules.patient.domain.entity.Person;
 import org.lamisplus.modules.patient.repository.PersonRepository;
 import org.lamisplus.modules.patient.service.PersonService;
-import org.lamisplus.modules.pmtct.domain.dto.ANCEnrollementRequestDto;
-import org.lamisplus.modules.pmtct.domain.dto.ANCRespondDto;
-import org.lamisplus.modules.pmtct.domain.dto.DeliveryRequestDto;
-import org.lamisplus.modules.pmtct.domain.dto.DeliveryResponseDto;
-import org.lamisplus.modules.pmtct.domain.dto.InfantDto;
-import org.lamisplus.modules.pmtct.domain.dto.InfantDtoResponse;
-import org.lamisplus.modules.pmtct.domain.dto.InfantVisitRequestDto;
-import org.lamisplus.modules.pmtct.domain.dto.InfantVisitResponseDto;
-import org.lamisplus.modules.pmtct.domain.dto.PmtctVisitRequestDto;
-import org.lamisplus.modules.pmtct.domain.dto.PmtctVisitResponseDto;
+import org.lamisplus.modules.pmtct.domain.dto.*;
+import org.lamisplus.modules.pmtct.domain.entity.PmtctPregnancyCycle;
+import org.lamisplus.modules.pmtct.repository.PmtctPregnancyCycleRepository;
 import org.lamisplus.modules.pmtct.service.ANCService;
 import org.lamisplus.modules.pmtct.service.DeliveryService;
 import org.lamisplus.modules.pmtct.service.InfantService;
@@ -44,6 +37,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -87,6 +81,7 @@ public class PHSQuickSyncService {
     private final InfantVisitService infantVisitService;
     private final InfantService infantService;
     private final IctEncounterService ictEncounterService;
+    private final PmtctPregnancyCycleRepository pmtctPregnancyCycleRepository;
     private final OrganisationUnitRepository organisationUnitRepository;
     private final QuickSyncHistoryRepository quickSyncHistoryRepository;
     private final QRReaderService qrReaderService;
@@ -195,6 +190,7 @@ public class PHSQuickSyncService {
                 Long patientId = null;
 
                 // 1. PERSON ------------------------------------------------------------
+                String personUuid = null;
                 try {
                     Optional<Person> existingPerson = (hospitalNumber != null && !hospitalNumber.trim().isEmpty())
                             ? personRepository.getPersonByHospitalNumberAndFacilityId(hospitalNumber, facilityId)
@@ -202,12 +198,14 @@ public class PHSQuickSyncService {
 
                     if (existingPerson.isPresent()) {
                         patientId = existingPerson.get().getId();
+                        personUuid = existingPerson.get().getUuid();
                         successfulComponents.add("person (existing)");
                         personUpdated++;
                     } else {
                         PersonDto personDto = qrReaderService.convertToPersonDto(personData);
                         PersonResponseDto personResponseDto = personService.createPerson(personDto);
                         patientId = personResponseDto.getId();
+                        personUuid = personResponseDto.getUuid();
                         successfulComponents.add("person (created)");
                         personCreated++;
                     }
@@ -225,6 +223,19 @@ public class PHSQuickSyncService {
                             .build());
                     completelyFailed++;
                     continue;
+                }
+
+                // 1.5 ENSURE PREGNANCY CYCLE EXISTS (if any PMTCT forms are present) -------
+                // Extract pmtctCycleUuid from any PMTCT section in the payload
+                String pmtctCycleUuid = extractPmtctCycleUuid(record);
+                if (pmtctCycleUuid != null && !pmtctCycleUuid.isEmpty()) {
+                    try {
+                        ensurePregnancyCycleExists(pmtctCycleUuid, personUuid, record, facilityId, hospitalNumber);
+                    } catch (Exception e) {
+                        System.err.println("PHS sync: failed to ensure pregnancy cycle exists for hospitalNumber=" + hospitalNumber + " - " + e.getMessage());
+                        // Don't fail the entire record, but log the issue
+                        // PMTCT forms will fail later with foreign key constraint if cycle creation failed
+                    }
                 }
 
                 // 2. HTS -----------------------------------------------------------------
@@ -292,11 +303,54 @@ public class PHSQuickSyncService {
                 if (pmtctEnrollmentAncField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
-                        Map<String, Object> pmtctEnrollmentAncData = (Map<String, Object>) pmtctEnrollmentAncField;
+                        Map<String, Object> ancData = (Map<String, Object>) pmtctEnrollmentAncField;
 
-                        ANCEnrollementRequestDto ancEnrollementRequestDto =
-                                objectMapper.convertValue(pmtctEnrollmentAncData, ANCEnrollementRequestDto.class);
-//                        ancEnrollementRequestDto.setPatient_uuid();
+                        // Extract nested objects using ObjectMapper
+                        VitalSignsDto vitalSigns = ancData.containsKey("vitalSigns") && ancData.get("vitalSigns") != null
+                                ? objectMapper.convertValue(ancData.get("vitalSigns"), VitalSignsDto.class) : null;
+                        CounsellingDto counselling = ancData.containsKey("counselling") && ancData.get("counselling") != null
+                                ? objectMapper.convertValue(ancData.get("counselling"), CounsellingDto.class) : null;
+                        SyphilisInfoDto syphilisInfo = ancData.containsKey("syphilisInfo") && ancData.get("syphilisInfo") != null
+                                ? objectMapper.convertValue(ancData.get("syphilisInfo"), SyphilisInfoDto.class) : null;
+                        HepatitisBDto hepatitisBInfo = ancData.containsKey("hepatitisBInfo") && ancData.get("hepatitisBInfo") != null
+                                ? objectMapper.convertValue(ancData.get("hepatitisBInfo"), HepatitisBDto.class) : null;
+                        HepatitisCDto hepatitisCInfo = ancData.containsKey("hepatitisCInfo") && ancData.get("hepatitisCInfo") != null
+                                ? objectMapper.convertValue(ancData.get("hepatitisCInfo"), HepatitisCDto.class) : null;
+                        UrinalysisDto urinalysis = ancData.containsKey("urinalysis") && ancData.get("urinalysis") != null
+                                ? objectMapper.convertValue(ancData.get("urinalysis"), UrinalysisDto.class) : null;
+                        LabTestDto labTest = ancData.containsKey("labTest") && ancData.get("labTest") != null
+                                ? objectMapper.convertValue(ancData.get("labTest"), LabTestDto.class) : null;
+                        InterventionsDto interventions = ancData.containsKey("interventions") && ancData.get("interventions") != null
+                                ? objectMapper.convertValue(ancData.get("interventions"), InterventionsDto.class) : null;
+
+                        // Use AllArgsConstructor with patient_uuid (final field)
+                        ANCEnrollementRequestDto ancEnrollementRequestDto = new ANCEnrollementRequestDto(
+                                (String) ancData.get("source"),
+                                (String) ancData.get("id"),
+                                (String) ancData.get("ancNo"),
+                                (String) ancData.get("ancAttendance"),
+                                (String) ancData.get("referredFromSpokesSite"),
+                                ancData.containsKey("dateOfEnrollment") && ancData.get("dateOfEnrollment") != null
+                                        ? LocalDate.parse(ancData.get("dateOfEnrollment").toString()) : null,
+                                parseInteger(ancData.get("gravida")),
+                                parseInteger(ancData.get("parity")),
+                                ancData.containsKey("lmp") && ancData.get("lmp") != null
+                                        ? LocalDate.parse(ancData.get("lmp").toString()) : null,
+                                parseInteger(ancData.get("gaweeks")),
+                                personUuid, // patient_uuid
+                                (String) ancData.get("pmtctCycleUuid"),
+                                vitalSigns,
+                                counselling,
+                                syphilisInfo,
+                                hepatitisBInfo,
+                                hepatitisCInfo,
+                                urinalysis,
+                                labTest,
+                                interventions,
+                                (String) ancData.get("outcomeOfVisit"),
+                                (String) ancData.get("referralReason"),
+                                (String) ancData.get("transportationOut")
+                        );
 
                         ANCRespondDto ancRespondDto = ancService.ANCEnrollement(ancEnrollementRequestDto);
                         pmtctEnrollmentAncEncounterId = ancRespondDto.getId();
@@ -326,7 +380,6 @@ public class PHSQuickSyncService {
                         if (pmtctHtsRequest.getFacilityId() == null) {
                             pmtctHtsRequest.setFacilityId(facilityId);
                         }
-
                         HtsEncounterResponse pmtctHtsResponse = htsEncounterService.save(pmtctHtsRequest);
                         pmtctHtsEncounterId = pmtctHtsResponse.getId();
                         resultBuilder.pmtctHtsEncounterId(pmtctHtsEncounterId);
@@ -401,10 +454,54 @@ public class PHSQuickSyncService {
                 if (pmtctMipField instanceof Map) {
                     try {
                         @SuppressWarnings("unchecked")
-                        Map<String, Object> pmtctMipData = (Map<String, Object>) pmtctMipField;
+                        Map<String, Object> mipData = (Map<String, Object>) pmtctMipField;
 
-                        ANCEnrollementRequestDto pmtctMipRequestDto =
-                                objectMapper.convertValue(pmtctMipData, ANCEnrollementRequestDto.class);
+                        // Extract nested objects using ObjectMapper
+                        VitalSignsDto mipVitalSigns = mipData.containsKey("vitalSigns") && mipData.get("vitalSigns") != null
+                                ? objectMapper.convertValue(mipData.get("vitalSigns"), VitalSignsDto.class) : null;
+                        CounsellingDto mipCounselling = mipData.containsKey("counselling") && mipData.get("counselling") != null
+                                ? objectMapper.convertValue(mipData.get("counselling"), CounsellingDto.class) : null;
+                        SyphilisInfoDto mipSyphilisInfo = mipData.containsKey("syphilisInfo") && mipData.get("syphilisInfo") != null
+                                ? objectMapper.convertValue(mipData.get("syphilisInfo"), SyphilisInfoDto.class) : null;
+                        HepatitisBDto mipHepatitisBInfo = mipData.containsKey("hepatitisBInfo") && mipData.get("hepatitisBInfo") != null
+                                ? objectMapper.convertValue(mipData.get("hepatitisBInfo"), HepatitisBDto.class) : null;
+                        HepatitisCDto mipHepatitisCInfo = mipData.containsKey("hepatitisCInfo") && mipData.get("hepatitisCInfo") != null
+                                ? objectMapper.convertValue(mipData.get("hepatitisCInfo"), HepatitisCDto.class) : null;
+                        UrinalysisDto mipUrinalysis = mipData.containsKey("urinalysis") && mipData.get("urinalysis") != null
+                                ? objectMapper.convertValue(mipData.get("urinalysis"), UrinalysisDto.class) : null;
+                        LabTestDto mipLabTest = mipData.containsKey("labTest") && mipData.get("labTest") != null
+                                ? objectMapper.convertValue(mipData.get("labTest"), LabTestDto.class) : null;
+                        InterventionsDto mipInterventions = mipData.containsKey("interventions") && mipData.get("interventions") != null
+                                ? objectMapper.convertValue(mipData.get("interventions"), InterventionsDto.class) : null;
+
+                        // Use AllArgsConstructor with patient_uuid (final field)
+                        ANCEnrollementRequestDto pmtctMipRequestDto = new ANCEnrollementRequestDto(
+                                (String) mipData.get("source"),
+                                (String) mipData.get("id"),
+                                (String) mipData.get("ancNo"),
+                                (String) mipData.get("ancAttendance"),
+                                (String) mipData.get("referredFromSpokesSite"),
+                                mipData.containsKey("dateOfEnrollment") && mipData.get("dateOfEnrollment") != null
+                                        ? LocalDate.parse(mipData.get("dateOfEnrollment").toString()) : null,
+                                parseInteger(mipData.get("gravida")),
+                                parseInteger(mipData.get("parity")),
+                                mipData.containsKey("lmp") && mipData.get("lmp") != null
+                                        ? LocalDate.parse(mipData.get("lmp").toString()) : null,
+                                parseInteger(mipData.get("gaweeks")),
+                                personUuid, // patient_uuid
+                                (String) mipData.get("pmtctCycleUuid"),
+                                mipVitalSigns,
+                                mipCounselling,
+                                mipSyphilisInfo,
+                                mipHepatitisBInfo,
+                                mipHepatitisCInfo,
+                                mipUrinalysis,
+                                mipLabTest,
+                                mipInterventions,
+                                (String) mipData.get("outcomeOfVisit"),
+                                (String) mipData.get("referralReason"),
+                                (String) mipData.get("transportationOut")
+                        );
 
                         ANCRespondDto ancRespondDto = ancService.ANCEnrollement(pmtctMipRequestDto);
                         pmtctMipId = ancRespondDto.getId();
@@ -682,5 +779,177 @@ public class PHSQuickSyncService {
         } catch (Exception e) {
             System.err.println("PHS sync: could not extract hospital number from person data - " + e.getMessage());        }
         return null;
+    }
+
+    /**
+     * Safely parse an integer from an Object that could be a String, Number, or null.
+     * Handles both "6" (String) and 6 (Integer) formats from JSON.
+     */
+    private Integer parseInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String) {
+            String strValue = ((String) value).trim();
+            if (strValue.isEmpty()) {
+                return null;
+            }
+            try {
+                return Integer.parseInt(strValue);
+            } catch (NumberFormatException e) {
+                System.err.println("PHS sync: could not parse integer from string: " + strValue);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extracts pmtctCycleUuid from any PMTCT section in the payload.
+     * Checks multiple sections in priority order: anc, pmtctHts, ancRevisit, etc.
+     */
+    @SuppressWarnings("unchecked")
+    private String extractPmtctCycleUuid(Map<String, Object> record) {
+        // Priority order: check sections most likely to have the UUID first
+        String[] pmtctSections = {
+            "anc",
+            "pmtctHts",
+            "pmtctRetesting",
+            "ancRevisit",
+            "motherInfantPairCard",
+            "labourDelivery",
+            "infantRegistration",
+            "childFollowupVisit",
+            "motherFollowupVisit"
+        };
+
+        for (String section : pmtctSections) {
+            Object sectionObj = record.get(section);
+            if (sectionObj instanceof Map) {
+                Map<String, Object> sectionData = (Map<String, Object>) sectionObj;
+                Object uuid = sectionData.get("pmtctCycleUuid");
+                if (uuid != null && !uuid.toString().trim().isEmpty()) {
+                    return uuid.toString().trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Ensures a pregnancy cycle exists in the database.
+     * If the cycle UUID doesn't exist, creates it using data from the payload.
+     * This prevents foreign key constraint violations when PMTCT forms reference the cycle.
+     */
+    @SuppressWarnings("unchecked")
+    private void ensurePregnancyCycleExists(String pmtctCycleUuid, String patientUuid,
+                                           Map<String, Object> record, Long facilityId,
+                                           String hospitalNumber) {
+        // Check if cycle already exists
+        Optional<PmtctPregnancyCycle> existingCycle = pmtctPregnancyCycleRepository.findById(pmtctCycleUuid);
+        if (existingCycle.isPresent()) {
+            // Cycle already exists, nothing to do
+            return;
+        }
+
+        // Cycle doesn't exist, create it
+        System.out.println("PHS sync: Creating pregnancy cycle " + pmtctCycleUuid + " for hospitalNumber=" + hospitalNumber);
+
+        // Extract entry point from payload (check multiple sources)
+        String entryPoint = extractEntryPoint(record);
+
+        PmtctPregnancyCycle cycle = new PmtctPregnancyCycle();
+        cycle.setUuid(pmtctCycleUuid); // Use UUID from mobile
+        cycle.setPatientUuid(patientUuid);
+        cycle.setEntryPoint(entryPoint);
+        cycle.setPmtctStatus("INACTIVE"); // Will be updated to ACTIVE by ANC Enrollment
+        cycle.setFacilityId(facilityId);
+        cycle.setArchived(false);
+        cycle.setIsClosed(false);
+        cycle.setCreatedDate(LocalDateTime.now());
+        cycle.setLastModifiedDate(LocalDateTime.now());
+        cycle.setCreatedBy("batch-sync");
+        cycle.setLastModifiedBy("batch-sync");
+
+        pmtctPregnancyCycleRepository.save(cycle);
+        System.out.println("PHS sync: Successfully created pregnancy cycle " + pmtctCycleUuid);
+    }
+
+    /**
+     * Extracts entry point from the payload by checking multiple PMTCT sections.
+     * Maps frontend entry point codes to backend codes.
+     */
+    @SuppressWarnings("unchecked")
+    private String extractEntryPoint(Map<String, Object> record) {
+        // Check ANC section first
+        Object ancField = record.get("anc");
+        if (ancField instanceof Map) {
+            Map<String, Object> ancData = (Map<String, Object>) ancField;
+            Object entryPoint = ancData.get("entryPoint");
+            if (entryPoint != null && !entryPoint.toString().trim().isEmpty()) {
+                return mapEntryPoint(entryPoint.toString());
+            }
+        }
+
+        // Check Labour & Delivery section
+        Object ldField = record.get("labourDelivery");
+        if (ldField instanceof Map) {
+            return "L&D";
+        }
+
+        // Check PMTCT HTS section
+        Object htsField = record.get("pmtctHts");
+        if (htsField instanceof Map) {
+            Map<String, Object> htsData = (Map<String, Object>) htsField;
+            Object entryPoint = htsData.get("pmtctTestEntryPoint");
+            if (entryPoint != null && !entryPoint.toString().trim().isEmpty()) {
+                return mapEntryPoint(entryPoint.toString());
+            }
+        }
+
+        // Check MIP section
+        Object mipField = record.get("motherInfantPairCard");
+        if (mipField instanceof Map) {
+            Map<String, Object> mipData = (Map<String, Object>) mipField;
+            Object entryPoint = mipData.get("entryPoint");
+            if (entryPoint != null && !entryPoint.toString().trim().isEmpty()) {
+                return mapEntryPoint(entryPoint.toString());
+            }
+        }
+
+        // Default to ANC if we can't determine
+        return "ANC";
+    }
+
+    /**
+     * Maps frontend entry point codes to backend codes.
+     * Frontend uses codes like "PMTCT_ENTRY_POINT_ANC", backend uses "ANC".
+     */
+    private String mapEntryPoint(String entryPoint) {
+        if (entryPoint == null) {
+            return "ANC";
+        }
+
+        // Map frontend codes to backend codes
+        switch (entryPoint.toUpperCase()) {
+            case "PMTCT_ENTRY_POINT_ANC":
+            case "ANC":
+                return "ANC";
+            case "PMTCT_ENTRY_POINT_L&D":
+            case "L&D":
+            case "LABOUR":
+            case "DELIVERY":
+                return "L&D";
+            case "PMTCT_ENTRY_POINT_POST-PARTUM":
+            case "POST-PARTUM":
+            case "POSTPARTUM":
+                return "Post-partum";
+            default:
+                // Return as-is if unrecognized
+                return entryPoint;
+        }
     }
 }
