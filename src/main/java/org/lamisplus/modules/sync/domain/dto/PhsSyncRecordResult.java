@@ -28,11 +28,13 @@ public class PhsSyncRecordResult {
     private Long ictEncounterId;
     private Long pmtctHtsEncounterId;
     private Long pmtctHtsRetestingEncounterId;
+    private Long pmtctEnrollmentLndEncounterId;
     private Long pmtctEnrollmentAncEncounterId;
-    private Long pmtctRevisitEncounterId;
-    private Long pmtctMotherFollowUpVisitEncounterId;
-    private Long pmtctChildFollowUpVisitEncounterId;
-    private Long infantRegistrationEncounterId;
+    private String pmtctRevisitEncounterId;
+    private String pmtctMotherFollowUpVisitEncounterId;
+    private String pmtctChildFollowUpVisitEncounterId;
+    private String infantRegistrationEncounterId;
+    private Long pmtctMipId;
 
     /** COMPLETELY_SUCCESSFUL | PARTIALLY_SUCCESSFUL | COMPLETELY_FAILED | SKIPPED */
     private String status;
